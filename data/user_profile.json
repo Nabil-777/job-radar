@@ -1,0 +1,11 @@
+{
+  "fullName": "Your Name",
+  "email": "your.email@example.com",
+  "phone": "+212 600-000000",
+  "title": "Full-Stack Developer / AI Enthusiast",
+  "school": "Engineering / CS Student",
+  "portfolioUrl": "https://github.com/yourusername",
+  "linkedinUrl": "https://linkedin.com/in/yourprofile",
+  "skills": "Python, JavaScript, React, Node.js, Docker, Git, REST APIs",
+  "preferredLanguage": "English"
+}

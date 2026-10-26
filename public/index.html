@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobRadar | Automated Tech Internship & Job Finder</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            surface: {
+              800: '#1e293b',
+              900: '#0f172a',
+              950: '#020617'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-surface-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-brand-600 selection:text-white">
+
+  <!-- Top Navigation -->
+  <header class="border-b border-slate-800 bg-surface-900/80 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-brand-500/20">
+          <i data-lucide="radar" class="w-6 h-6 text-white animate-pulse"></i>
+        </div>
+        <div>
+          <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">JobRadar</span>
+          <span class="text-xs ml-2 px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 font-medium">Auto-Aggregator</span>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center space-x-1 sm:space-x-2">
+        <button id="tab-jobs" onclick="switchTab('jobs')" class="nav-tab active px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 bg-brand-600 text-white shadow-sm">
+          <i data-lucide="search" class="w-4 h-4"></i>
+          <span>Find Jobs</span>
+        </button>
+        <button id="tab-morocco" onclick="switchTab('morocco')" class="nav-tab px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800/60">
+          <span>🇲🇦</span>
+          <span>Morocco Tech Hub</span>
+        </button>
+        <button id="tab-tracker" onclick="switchTab('tracker')" class="nav-tab px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800/60">
+          <i data-lucide="bookmark-check" class="w-4 h-4"></i>
+          <span>My Applications</span>
+          <span id="tracker-count-badge" class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-800 text-xs text-brand-300 border border-slate-700">0</span>
+        </button>
+        <button id="tab-profile" onclick="switchTab('profile')" class="nav-tab px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800/60">
+          <i data-lucide="user-check" class="w-4 h-4"></i>
+          <span>My Profile & Pitch</span>
+        </button>
+        <button id="tab-tips" onclick="switchTab('tips')" class="nav-tab px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-slate-800/60">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <span class="hidden sm:inline">Application Tips</span>
+        </button>
+        <button onclick="openCustomProvidersModal()" class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 shadow-sm">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-indigo-400"></i>
+          <span class="hidden sm:inline">Add Feeds & Providers</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- ==================== TAB 1: FIND JOBS ==================== -->
+    <div id="view-jobs" class="space-y-6">
+
+      <!-- Hero Banner -->
+      <div class="rounded-2xl p-6 sm:p-8 bg-gradient-to-r from-surface-900 via-surface-900 to-indigo-950/40 border border-slate-800 shadow-xl relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-brand-600/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="relative z-10 max-w-3xl">
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-3">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>Real-time Multi-Platform Aggregator Active (19+ Built-in & Custom Feeds)</span>
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            Find Internships & Tech Jobs Across 19+ Platforms & Custom Feeds
+          </h1>
+          <p class="text-sm sm:text-base text-slate-400 mt-2">
+            Aggregated live from <strong class="text-amber-400">GitHub Tech Index (2,400+ FAANG/Top Internships)</strong>, <strong class="text-sky-300">LinkedIn</strong>, <strong class="text-blue-300">Indeed</strong>, <strong class="text-orange-400">Jobzyn.com (Maroc)</strong>, <strong class="text-teal-300">WeTech.ma (100% IT)</strong>, <strong class="text-emerald-400">Talent.com (Maroc)</strong>, <strong class="text-amber-300">Dreamjob.ma</strong>, <strong class="text-sky-400">Emploi.ma</strong>, <strong class="text-indigo-400">Morocco Top ESN Hub</strong>, <strong class="text-rose-400">Rekrute</strong>, <strong class="text-cyan-300">Relocate.me (Europe Visa)</strong>, <strong class="text-orange-300">Y Combinator</strong>, <strong class="text-emerald-400">Himalayas</strong>, <strong class="text-rose-400">Remotive</strong>, <strong class="text-amber-300">RemoteOK</strong>, <strong class="text-purple-300">Arbeitnow</strong>, <strong class="text-pink-400">Custom RSS Feeds</strong>, and <strong class="text-orange-300">Hacker News</strong>.
+          </p>
+        </div>
+      </div>
+
+      <!-- Search & Filter Controls -->
+      <div class="bg-surface-900/90 border border-slate-800 rounded-xl p-5 shadow-lg space-y-4">
+        <!-- Quick Domain Selection Pills -->
+        <div class="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-thin">
+          <span class="text-xs uppercase tracking-wider text-slate-400 font-bold whitespace-nowrap mr-1">Domains:</span>
+          <button onclick="setDomain('all')" class="domain-pill px-3 py-1.5 rounded-lg text-xs font-medium border border-brand-500/40 bg-brand-600/20 text-brand-300 hover:bg-brand-600 hover:text-white transition-all whitespace-nowrap active" data-domain="all">
+            🌐 All Tech
+          </button>
+          <button onclick="setDomain('ai')" class="domain-pill px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-surface-800 text-slate-300 hover:border-brand-500/50 hover:text-white transition-all whitespace-nowrap" data-domain="ai">
+            🤖 AI & Machine Learning
+          </button>
+          <button onclick="setDomain('cybersecurity')" class="domain-pill px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-surface-800 text-slate-300 hover:border-brand-500/50 hover:text-white transition-all whitespace-nowrap" data-domain="cybersecurity">
+            🛡️ Cybersecurity & SOC
+          </button>
+          <button onclick="setDomain('dev')" class="domain-pill px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-surface-800 text-slate-300 hover:border-brand-500/50 hover:text-white transition-all whitespace-nowrap" data-domain="dev">
+            💻 Software / Web Dev
+          </button>
+          <button onclick="setDomain('cloud')" class="domain-pill px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-surface-800 text-slate-300 hover:border-brand-500/50 hover:text-white transition-all whitespace-nowrap" data-domain="cloud">
+            ☁️ Cloud & DevOps
+          </button>
+          <button onclick="setDomain('data')" class="domain-pill px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-surface-800 text-slate-300 hover:border-brand-500/50 hover:text-white transition-all whitespace-nowrap" data-domain="data">
+            📊 Data Science & Eng
+          </button>
+          <button onclick="setDomain('mobile')" class="domain-pill px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-surface-800 text-slate-300 hover:border-brand-500/50 hover:text-white transition-all whitespace-nowrap" data-domain="mobile">
+            📱 Mobile Dev
+          </button>
+        </div>
+
+        <!-- Filter Fields Grid -->
+        <form id="search-form" onsubmit="handleSearch(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
+          <!-- Keywords Input -->
+          <div class="lg:col-span-2 relative">
+            <label class="block text-xs font-medium text-slate-400 mb-1">Keywords / Skills</label>
+            <div class="relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-3"></i>
+              <input type="text" id="input-keywords" placeholder="e.g. React, Python, SOC, PFE, LLM, Capgemini..." class="w-full pl-9 pr-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-all">
+            </div>
+          </div>
+
+          <!-- Experience Level Filter -->
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Experience Level</label>
+            <select id="select-level" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-all">
+              <option value="internship" selected>🎓 Internship / Stage PFE</option>
+              <option value="entry">🚀 Entry Level / Junior (0-2y)</option>
+              <option value="all">🌐 All Experience Levels</option>
+              <option value="mid">⚡ Mid-Level</option>
+              <option value="senior">🏆 Senior / Lead</option>
+            </select>
+          </div>
+
+          <!-- Location Filter -->
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Location</label>
+            <select id="select-location" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500 transition-all">
+              <option value="Morocco">🇲🇦 Morocco (Stage / Local)</option>
+              <option value="Worldwide" selected>🌍 Worldwide / Global</option>
+              <option value="Remote">💻 100% Remote</option>
+              <option value="Europe">🇪🇺 Europe</option>
+              <option value="France">🇫🇷 France</option>
+              <option value="United States">🇺🇸 United States</option>
+            </select>
+          </div>
+
+          <!-- Search Button -->
+          <div class="flex items-end">
+            <button type="submit" id="btn-search" class="w-full h-[38px] bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-sm font-semibold rounded-lg shadow-lg shadow-brand-500/20 flex items-center justify-center space-x-2 transition-all">
+              <i data-lucide="search" class="w-4 h-4"></i>
+              <span>Search Opportunities</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Advanced Filters Drawer -->
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 text-xs text-slate-400">
+          <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-1">
+              <span>Source:</span>
+              <select id="select-source" onchange="triggerSearch()" class="bg-surface-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300">
+                <option value="all">⚡ All 19+ Providers & Custom Feeds</option>
+                <option value="jobzyn">🇲🇦 Jobzyn.com (Maroc Startups & Scaleups)</option>
+                <option value="wetech">🇲🇦 WeTech.ma (100% IT Maroc)</option>
+                <option value="talent-morocco">🇲🇦 Talent.com Maroc (Agrégateur IT National)</option>
+                <option value="dreamjob">🇲🇦 Dreamjob.ma (Stages & Concours Public/Privé)</option>
+                <option value="emploi-ma">🇲🇦 Emploi.ma (Informatique & High-Tech)</option>
+                <option value="esn-morocco">🇲🇦 Morocco Top ESN Hub (Capgemini, DXC, CGI, Alten, etc.)</option>
+                <option value="rekrute">🇲🇦 Rekrute.com (Morocco IT & Stage PFE)</option>
+                <option value="custom">⚡ Custom Feeds (User-Added RSS & APIs)</option>
+                <option value="simplify">🚀 GitHub Tech Index (2,400+ FAANG/Top Internships)</option>
+                <option value="indeed">Indeed Only</option>
+                <option value="linkedin">LinkedIn Only</option>
+                <option value="relocate">Relocate.me (Europe Visa Sponsored)</option>
+                <option value="yc">Y Combinator (YC Startups)</option>
+                <option value="himalayas">Himalayas Only</option>
+                <option value="jobicy">Jobicy Only</option>
+                <option value="wwr">WeWorkRemotely Only</option>
+                <option value="remotive">Remotive Only</option>
+                <option value="remoteok">RemoteOK Only</option>
+                <option value="arbeitnow">Arbeitnow Only</option>
+                <option value="hackernews">Hacker News Only</option>
+              </select>
+            </div>
+            <div class="flex items-center space-x-1">
+              <span>Work Type:</span>
+              <select id="select-worktype" onchange="triggerSearch()" class="bg-surface-800 border border-slate-700 rounded px-2 py-1 text-xs text-slate-300">
+                <option value="all">Any Work Type</option>
+                <option value="remote">Remote Only</option>
+                <option value="onsite">On-site</option>
+                <option value="hybrid">Hybrid</option>
+              </select>
+            </div>
+          </div>
+          <div id="results-stat-bar" class="hidden sm:flex items-center space-x-3 text-xs">
+            <span class="text-slate-400">Found: <strong id="stat-total" class="text-white">0</strong> opportunities</span>
+            <span class="text-emerald-400">🎓 <span id="stat-intern">0</span> Internships</span>
+            <span class="text-blue-400">🚀 <span id="stat-entry">0</span> Junior/Entry</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results Section -->
+      <div class="space-y-4">
+        <!-- Results Header / Filter Bar -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i data-lucide="briefcase" class="w-5 h-5 text-brand-400"></i>
+              <span>Available Opportunities</span>
+            </h2>
+            <span id="badge-loading" class="hidden px-2 py-0.5 rounded text-xs bg-brand-500/20 text-brand-300 animate-pulse">
+              Scanning 18 portals...
+            </span>
+          </div>
+          <div class="flex items-center space-x-2">
+            <button onclick="exportCurrentJobs()" class="px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center space-x-1.5 transition-all">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Export CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Job Cards Container -->
+        <div id="job-cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Dynamically inserted cards -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden py-16 text-center border border-dashed border-slate-800 rounded-2xl bg-surface-900/40">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800/80 flex items-center justify-center text-slate-500">
+            <i data-lucide="search-x" class="w-8 h-8"></i>
+          </div>
+          <h3 class="text-lg font-semibold text-slate-300">No matching jobs found</h3>
+          <p class="text-sm text-slate-500 mt-1 max-w-md mx-auto">Try broadening your search keywords, switching locations to "Worldwide", or setting experience level to "All".</p>
+          <button onclick="resetFiltersAndSearch()" class="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-medium transition-all">
+            Reset Filters
+          </button>
+        </div>
+
+        <!-- Initial Skeleton Loading -->
+        <div id="loading-skeletons" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="animate-pulse bg-surface-900 border border-slate-800/80 p-5 rounded-xl space-y-3">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-lg bg-slate-800"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-4 bg-slate-800 rounded w-3/4"></div>
+                <div class="h-3 bg-slate-800 rounded w-1/2"></div>
+              </div>
+            </div>
+            <div class="h-3 bg-slate-800 rounded w-full"></div>
+            <div class="h-8 bg-slate-800/60 rounded"></div>
+          </div>
+          <div class="animate-pulse bg-surface-900 border border-slate-800/80 p-5 rounded-xl space-y-3">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-lg bg-slate-800"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-4 bg-slate-800 rounded w-3/4"></div>
+                <div class="h-3 bg-slate-800 rounded w-1/2"></div>
+              </div>
+            </div>
+            <div class="h-3 bg-slate-800 rounded w-full"></div>
+            <div class="h-8 bg-slate-800/60 rounded"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB: MOROCCO TECH & ESN DIRECTORY ==================== -->
+    <div id="view-morocco" class="hidden space-y-8">
+      <!-- Hero Banner -->
+      <div class="rounded-2xl p-6 sm:p-8 bg-gradient-to-r from-surface-900 via-surface-900 to-rose-950/30 border border-slate-800 shadow-xl relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-rose-600/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="relative z-10 max-w-3xl">
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold mb-3">
+            <span>🇲🇦</span>
+            <span>Le Hub Spécialisé Tech & PFE au Maroc</span>
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            Les Portails Directs ESN, Jobboards Tech & Startups au Maroc
+          </h1>
+          <p class="text-sm sm:text-base text-slate-400 mt-2">
+            Au Maroc, <strong class="text-rose-300">80 % des stages PFE (avec pré-embauche)</strong> et des recrutements Juniors IT passent directement par les portails carrières des multinationales (Casa Nearshore, Technopolis Rabat, Fès Shore, Oujda Shore) et les plateformes spécialisées.
+          </p>
+          <div class="mt-4 p-3 rounded-lg bg-surface-800/80 border border-slate-700/60 text-xs text-amber-300 flex items-center space-x-2">
+            <i data-lucide="calendar" class="w-4 h-4 flex-shrink-0 text-amber-400"></i>
+            <span><strong>Période Clé PFE :</strong> Postulez massivement entre <strong>Novembre et Février</strong> pour maximiser vos chances de décrocher un PFE avec pré-embauche !</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 1: TOP ESN / SSII MULTINATIONALES -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+              <i data-lucide="building-2" class="w-5 h-5 text-indigo-400"></i>
+              <span>1. Les Portails Directs des ESN / SSII (Les Plus Gros Recruteurs IT)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Cliquez sur « Scanner Offres » pour chercher en direct sur JobRadar ou accédez directement au portail carrière.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Capgemini -->
+          <div class="bg-surface-900 border border-slate-800 hover:border-brand-500/40 transition-all rounded-xl p-5 flex flex-col justify-between shadow-md space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white text-base">Capgemini Maroc</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">Nearshore</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Casa Nearshore, Technopolis Rabat, Fès Shore</p>
+              <p class="text-xs text-slate-300 mt-2 font-mono text-[11px] bg-surface-800 p-2 rounded">
+                <strong>Profils :</strong> Java, Angular, DevOps, Cloud, Data, Cyber. Des centaines de PFE chaque année.
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button onclick="searchDirectCompany('Capgemini')" class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Scanner Offres</span>
+              </button>
+              <a href="https://www.capgemini.com/ma-en/careers/" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-surface-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 flex items-center space-x-1">
+                <span>Site Carrières</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+
+          <!-- DXC Technology -->
+          <div class="bg-surface-900 border border-slate-800 hover:border-brand-500/40 transition-all rounded-xl p-5 flex flex-col justify-between shadow-md space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white text-base">DXC Technology Maroc</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">Technopolis</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Technopolis Rabat, Casablanca</p>
+              <p class="text-xs text-slate-300 mt-2 font-mono text-[11px] bg-surface-800 p-2 rounded">
+                <strong>Profils :</strong> Java Fullstack, Kafka, Cybersécurité, Mainframe, Cloud, Support IT.
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button onclick="searchDirectCompany('DXC Technology')" class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Scanner Offres</span>
+              </button>
+              <a href="https://dxc.com/careers" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-surface-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 flex items-center space-x-1">
+                <span>Site Carrières</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+
+          <!-- CGI Maroc -->
+          <div class="bg-surface-900 border border-slate-800 hover:border-brand-500/40 transition-all rounded-xl p-5 flex flex-col justify-between shadow-md space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white text-base">CGI Maroc</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">Rabat / Casa / Fès</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Rabat, Casablanca, Fès</p>
+              <p class="text-xs text-slate-300 mt-2 font-mono text-[11px] bg-surface-800 p-2 rounded">
+                <strong>Profils :</strong> Stages PFE structurés, ERP (SAP), BI, Full-Stack, Cybersécurité, Machine Learning.
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button onclick="searchDirectCompany('CGI')" class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Scanner Offres</span>
+              </button>
+              <a href="https://www.cgi.com/fr/carrieres-maroc" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-surface-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 flex items-center space-x-1">
+                <span>Site Carrières</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+
+          <!-- Alten Maroc -->
+          <div class="bg-surface-900 border border-slate-800 hover:border-brand-500/40 transition-all rounded-xl p-5 flex flex-col justify-between shadow-md space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white text-base">Alten Maroc</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">Multi-Sites</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Rabat, Fès, Tétouan, Casablanca</p>
+              <p class="text-xs text-slate-300 mt-2 font-mono text-[11px] bg-surface-800 p-2 rounded">
+                <strong>Profils :</strong> Dev Logiciel, Systèmes Embarqués, Réseaux, QA/Test, Data Science (GCP/Python).
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button onclick="searchDirectCompany('Alten')" class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Scanner Offres</span>
+              </button>
+              <a href="https://www.alten.ma/carrieres/" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-surface-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 flex items-center space-x-1">
+                <span>Site Carrières</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+
+          <!-- Inetum & Sofrecom -->
+          <div class="bg-surface-900 border border-slate-800 hover:border-brand-500/40 transition-all rounded-xl p-5 flex flex-col justify-between shadow-md space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white text-base">Inetum & Sofrecom (Orange)</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/20">Orange IT</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Casa Nearshore, Rabat Technopolis</p>
+              <p class="text-xs text-slate-300 mt-2 font-mono text-[11px] bg-surface-800 p-2 rounded">
+                <strong>Profils :</strong> Très fortes campagnes PFE & télécoms/dev (Java, Angular, Cloud, Microservices).
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button onclick="searchDirectCompany('Inetum OR Sofrecom')" class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Scanner Offres</span>
+              </button>
+              <a href="https://www.sofrecom.com/fr/carrieres/nos-offres.html" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-surface-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 flex items-center space-x-1">
+                <span>Site Carrières</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+
+          <!-- Oracle Labs Maroc -->
+          <div class="bg-surface-900 border border-slate-800 hover:border-brand-500/40 transition-all rounded-xl p-5 flex flex-col justify-between shadow-md space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white text-base">Oracle Labs Maroc (R&D)</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">R&D Elite</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Casablanca, Rabat Technopolis</p>
+              <p class="text-xs text-slate-300 mt-2 font-mono text-[11px] bg-surface-800 p-2 rounded">
+                <strong>Profils :</strong> Stages R&D d'élite très bien rémunérés en Algorithmique, IA/ML, Java/GraalVM.
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button onclick="searchDirectCompany('Oracle')" class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Scanner Offres</span>
+              </button>
+              <a href="https://www.oracle.com/corporate/careers/" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-surface-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 flex items-center space-x-1">
+                <span>Site Carrières</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+
+          <!-- SQLI Maroc -->
+          <div class="bg-surface-900 border border-slate-800 hover:border-brand-500/40 transition-all rounded-xl p-5 flex flex-col justify-between shadow-md space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white text-base">SQLI Maroc</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">E-Commerce Leader</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Rabat, Casablanca, Oujda</p>
+              <p class="text-xs text-slate-300 mt-2 font-mono text-[11px] bg-surface-800 p-2 rounded">
+                <strong>Profils :</strong> Symfony, React, .NET, Magento, QA Testeur, E-Commerce. Très présent à Oujda.
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button onclick="searchDirectCompany('SQLI')" class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Scanner Offres</span>
+              </button>
+              <a href="https://www.sqli.com/fr/maroc/carrieres" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-surface-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 flex items-center space-x-1">
+                <span>Site Carrières</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+
+          <!-- Atos / Eviden -->
+          <div class="bg-surface-900 border border-slate-800 hover:border-brand-500/40 transition-all rounded-xl p-5 flex flex-col justify-between shadow-md space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white text-base">ATOS / Eviden Maroc</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Cloud & Cyber</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Casablanca, Rabat</p>
+              <p class="text-xs text-slate-300 mt-2 font-mono text-[11px] bg-surface-800 p-2 rounded">
+                <strong>Profils :</strong> Cloud, Big Data, Cybersécurité, Systèmes IBM i, Développement.
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button onclick="searchDirectCompany('Atos')" class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Scanner Offres</span>
+              </button>
+              <a href="https://atos.net/fr/carrieres" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-surface-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 flex items-center space-x-1">
+                <span>Site Carrières</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+
+          <!-- Sopra Steria -->
+          <div class="bg-surface-900 border border-slate-800 hover:border-brand-500/40 transition-all rounded-xl p-5 flex flex-col justify-between shadow-md space-y-3">
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white text-base">Sopra Steria Maroc</h3>
+                <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-pink-500/10 text-pink-400 border border-pink-500/20">Éditeur Logiciel</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Casablanca</p>
+              <p class="text-xs text-slate-300 mt-2 font-mono text-[11px] bg-surface-800 p-2 rounded">
+                <strong>Profils :</strong> Développement logiciel, ERP RH (Sopra HR), Java, Ingénierie logicielle.
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+              <button onclick="searchDirectCompany('Sopra Steria')" class="px-2.5 py-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1">
+                <i data-lucide="search" class="w-3.5 h-3.5"></i>
+                <span>Scanner Offres</span>
+              </button>
+              <a href="https://www.soprasteria.ma/carrieres" target="_blank" rel="noopener noreferrer" class="px-2.5 py-1.5 bg-surface-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 flex items-center space-x-1">
+                <span>Site Carrières</span>
+                <i data-lucide="external-link" class="w-3 h-3"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: LES JOBBOARDS TECH MAROC -->
+      <div class="space-y-4">
+        <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+          <i data-lucide="layout-grid" class="w-5 h-5 text-emerald-400"></i>
+          <span>2. Les Jobboards & Moteurs Spécifiques Tech au Maroc</span>
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- WeTech.ma -->
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/20 font-semibold">100% IT Maroc</span>
+            <h3 class="text-base font-bold text-white">WeTech.ma</h3>
+            <p class="text-xs text-slate-400">Dédié 100% à l'informatique, au digital et aux nouvelles technologies au Maroc. Filtrage direct par stack.</p>
+            <div class="pt-2 flex items-center justify-between">
+              <button onclick="searchByProvider('wetech')" class="text-xs font-semibold text-brand-400 hover:underline">Rechercher</button>
+              <a href="https://www.wetech.ma/offres-emploi/" target="_blank" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1"><span>Ouvrir</span><i data-lucide="external-link" class="w-3 h-3"></i></a>
+            </div>
+          </div>
+
+          <!-- Jobzyn.com -->
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-orange-500/10 text-orange-400 border border-orange-500/20 font-semibold">Startups & Scaleups</span>
+            <h3 class="text-base font-bold text-white">Jobzyn.com</h3>
+            <p class="text-xs text-slate-400">Le "Welcome to the Jungle" marocain. Orienté Startups, Scale-ups et cabinets Tech modernes avec culture d'entreprise.</p>
+            <div class="pt-2 flex items-center justify-between">
+              <button onclick="searchByProvider('jobzyn')" class="text-xs font-semibold text-brand-400 hover:underline">Rechercher</button>
+              <a href="https://www.jobzyn.com/fr/jobs/maroc" target="_blank" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1"><span>Ouvrir</span><i data-lucide="external-link" class="w-3 h-3"></i></a>
+            </div>
+          </div>
+
+          <!-- Talent.com Maroc -->
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">Agrégateur National</span>
+            <h3 class="text-base font-bold text-white">Talent.com Maroc</h3>
+            <p class="text-xs text-slate-400">Aspire automatiquement les offres publiées sur les sites des entreprises et multinationales présentes au Maroc.</p>
+            <div class="pt-2 flex items-center justify-between">
+              <button onclick="searchByProvider('talent-morocco')" class="text-xs font-semibold text-brand-400 hover:underline">Rechercher</button>
+              <a href="https://ma.talent.com/jobs?k=informatique&l=Morocco" target="_blank" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1"><span>Ouvrir</span><i data-lucide="external-link" class="w-3 h-3"></i></a>
+            </div>
+          </div>
+
+          <!-- Dreamjob.ma -->
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">Stages & Concours</span>
+            <h3 class="text-base font-bold text-white">Dreamjob.ma</h3>
+            <p class="text-xs text-slate-400">Annonces de stages et recrutements d'ingénieurs & techniciens IT dans le secteur public, semi-public et privé marocain.</p>
+            <div class="pt-2 flex items-center justify-between">
+              <button onclick="searchByProvider('dreamjob')" class="text-xs font-semibold text-brand-400 hover:underline">Rechercher</button>
+              <a href="https://dreamjob.ma/?s=stage+informatique" target="_blank" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1"><span>Ouvrir</span><i data-lucide="external-link" class="w-3 h-3"></i></a>
+            </div>
+          </div>
+
+          <!-- Emploi.ma -->
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 font-semibold">Grand Portail Maroc</span>
+            <h3 class="text-base font-bold text-white">Emploi.ma</h3>
+            <p class="text-xs text-slate-400">Le 2ème grand portail d'emploi au Maroc. Des dizaines d'offres IT quotidiennes (Dev, Réseaux, Helpdesk, Stages).</p>
+            <div class="pt-2 flex items-center justify-between">
+              <button onclick="searchByProvider('emploi-ma')" class="text-xs font-semibold text-brand-400 hover:underline">Rechercher</button>
+              <a href="https://www.emploi.ma/recherche-jobs-maroc?f%5B0%5D=im_field_offre_metiers%3A31" target="_blank" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1"><span>Ouvrir</span><i data-lucide="external-link" class="w-3 h-3"></i></a>
+            </div>
+          </div>
+
+          <!-- Rekrute.com -->
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">Corporate & PFE</span>
+            <h3 class="text-base font-bold text-white">Rekrute.com</h3>
+            <p class="text-xs text-slate-400">Leader historique des offres d'emploi et stages PFE pour les grandes banques et multinationales marocaines.</p>
+            <div class="pt-2 flex items-center justify-between">
+              <button onclick="searchByProvider('rekrute')" class="text-xs font-semibold text-brand-400 hover:underline">Rechercher</button>
+              <a href="https://www.rekrute.com/offres.html?keyword=informatique" target="_blank" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1"><span>Ouvrir</span><i data-lucide="external-link" class="w-3 h-3"></i></a>
+            </div>
+          </div>
+
+          <!-- Geeksblabla / Kahraba -->
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold">Communauté Dev</span>
+            <h3 class="text-base font-bold text-white">Kahraba (Geeksblabla)</h3>
+            <p class="text-xs text-slate-400">La plus grande communauté de développeurs au Maroc. Vraies offres ciblées partagées sur Discord et BlablaConf.</p>
+            <div class="pt-2 flex items-center justify-between">
+              <a href="https://geeksblabla.com" target="_blank" class="text-xs text-brand-400 hover:underline">Site Officiel</a>
+              <a href="https://discord.gg/geeksblabla" target="_blank" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1"><span>Discord Jobs</span><i data-lucide="external-link" class="w-3 h-3"></i></a>
+            </div>
+          </div>
+
+          <!-- OptionCarriere & Jobsquare -->
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">Moteurs Multi-Sites</span>
+            <h3 class="text-base font-bold text-white">OptionCarriere & Jobsquare</h3>
+            <p class="text-xs text-slate-400">Moteurs rapides qui scannent tout le web marocain pour regrouper les annonces "Stage Informatique" ou "Développeur".</p>
+            <div class="pt-2 flex items-center justify-between">
+              <a href="https://www.optioncarriere.ma/emploi-stage-informatique.html" target="_blank" class="text-xs text-brand-400 hover:underline">OptionCarriere</a>
+              <a href="https://jobsquare.ma/" target="_blank" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1"><span>Jobsquare</span><i data-lucide="external-link" class="w-3 h-3"></i></a>
+            </div>
+          </div>
+
+          <!-- Alwadifa-Maroc -->
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-2">
+            <span class="px-2 py-0.5 rounded text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 font-semibold">Secteur Public IT</span>
+            <h3 class="text-base font-bold text-white">Alwadifa-Maroc.com</h3>
+            <p class="text-xs text-slate-400">Portail officiel des avis de recrutement et concours IT pour les ministères, offices (OCP, ONCF, ADM) et agences publiques.</p>
+            <div class="pt-2 flex items-center justify-between">
+              <a href="https://www.alwadifa-maroc.com/" target="_blank" class="text-xs text-brand-400 hover:underline">Portail Concours</a>
+              <a href="https://www.alwadifa-maroc.com/search?q=informatique" target="_blank" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1"><span>Offres IT</span><i data-lucide="external-link" class="w-3 h-3"></i></a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: PROGRAMMES D'INSERTION & BOOTCAMPS -->
+      <div class="space-y-4">
+        <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+          <i data-lucide="graduation-cap" class="w-5 h-5 text-amber-400"></i>
+          <span>3. Programmes de Bootcamps & Insertion Directe (Job-Ready)</span>
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <!-- JobInTech -->
+          <div class="bg-surface-900 border border-slate-800 p-5 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-white text-base">JobInTech.academy</h3>
+              <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">100% Gratuit</span>
+            </div>
+            <p class="text-xs text-slate-300">Programme national soutenu par le gouvernement marocain. Forme aux métiers du Dev, Cloud & Data avec plus de <strong>200 entreprises partenaires</strong> au Maroc pour l'embauche directe.</p>
+            <a href="https://jobintech.academy/" target="_blank" class="inline-flex items-center space-x-1 text-xs text-brand-400 hover:underline pt-2 font-semibold">
+              <span>Découvrir le programme</span>
+              <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+          </div>
+
+          <!-- YouCode & 1337 -->
+          <div class="bg-surface-900 border border-slate-800 p-5 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-white text-base">YouCode & 1337</h3>
+              <span class="px-2 py-0.5 rounded text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">OCP / 42</span>
+            </div>
+            <p class="text-xs text-slate-300">YouCode (Youssoufia, Safi, Nador) et 1337 (Khouribga, Benguerir, Tétouan, Rabat). Leurs forums d'entreprises et réseaux attirent toutes les banques et startups du Maroc.</p>
+            <div class="flex items-center space-x-3 pt-2 text-xs">
+              <a href="https://youcode.ma/" target="_blank" class="text-brand-400 hover:underline font-semibold">YouCode.ma</a>
+              <span class="text-slate-600">•</span>
+              <a href="https://1337.ma/" target="_blank" class="text-brand-400 hover:underline font-semibold">1337.ma</a>
+            </div>
+          </div>
+
+          <!-- ARK-X -->
+          <div class="bg-surface-900 border border-slate-800 p-5 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-white text-base">ARK-X Talent Factory</h3>
+              <span class="px-2 py-0.5 rounded text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold">Bootcamp Tech</span>
+            </div>
+            <p class="text-xs text-slate-300">Programmes intensifs (MERN Stack, Salesforce, AI) directement adossés à des stages de pré-embauche dans des cabinets et ESN partenaires.</p>
+            <a href="https://arkx.talentfactory.ma/" target="_blank" class="inline-flex items-center space-x-1 text-xs text-brand-400 hover:underline pt-2 font-semibold">
+              <span>Voir les sessions</span>
+              <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 4: REMOTE DEPUIS LE MAROC (INTERNATIONAL & MENA) -->
+      <div class="space-y-4">
+        <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+          <i data-lucide="globe" class="w-5 h-5 text-cyan-400"></i>
+          <span>4. Plateformes pour Travailler en Remote depuis le Maroc (En Devises)</span>
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-1.5">
+            <h4 class="text-sm font-bold text-white flex items-center justify-between">
+              <span>Welcome to the Jungle</span>
+              <span class="text-[10px] text-cyan-400 font-semibold">France / Remote</span>
+            </h4>
+            <p class="text-xs text-slate-400">Filtrez sur <strong>« Télétravail total »</strong>. De nombreuses startups et scale-ups françaises embauchent des développeurs marocains en télétravail.</p>
+            <a href="https://www.welcometothejungle.com/fr/jobs?query=&page=1&refinementList%5Bremote%5D%5B%5D=fulltime" target="_blank" class="text-xs text-brand-400 hover:underline flex items-center space-x-1 pt-1 font-semibold">
+              <span>Voir offres Full-Remote</span>
+              <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+          </div>
+
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-1.5">
+            <h4 class="text-sm font-bold text-white flex items-center justify-between">
+              <span>Wellfound (ex-AngelList)</span>
+              <span class="text-[10px] text-emerald-400 font-semibold">Startups Global</span>
+            </h4>
+            <p class="text-xs text-slate-400">La référence mondiale pour postuler directement dans des startups en amorçage (beaucoup d'Internships et rôles Junior en remote mondial).</p>
+            <a href="https://wellfound.com/jobs" target="_blank" class="text-xs text-brand-400 hover:underline flex items-center space-x-1 pt-1 font-semibold">
+              <span>Explorer Wellfound</span>
+              <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+          </div>
+
+          <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl space-y-1.5">
+            <h4 class="text-sm font-bold text-white flex items-center justify-between">
+              <span>Ureed.com & Bayt</span>
+              <span class="text-[10px] text-amber-400 font-semibold">Dubaï / Golfe</span>
+            </h4>
+            <p class="text-xs text-slate-400">Très utilisés par les entreprises des Émirats Arabes Unis (Dubaï) et d'Arabie Saoudite qui recherchent activement des devs marocains en remote rémunérés en USD.</p>
+            <a href="https://ureed.com/" target="_blank" class="text-xs text-brand-400 hover:underline flex items-center space-x-1 pt-1 font-semibold">
+              <span>Voir Ureed.com</span>
+              <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 2: APPLICATION TRACKER ==================== -->
+    <div id="view-tracker" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-surface-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+            <i data-lucide="bookmark-check" class="w-6 h-6 text-emerald-400"></i>
+            <span>My Application Tracker</span>
+          </h2>
+          <p class="text-sm text-slate-400 mt-1">Track where you applied, interview dates, and personal follow-up notes.</p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <a href="/api/export/applications" class="px-4 py-2 rounded-lg bg-surface-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center space-x-2 transition-all">
+            <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-400"></i>
+            <span>Download CSV Spreadsheet</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Tracker Filter Tabs -->
+      <div class="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-thin">
+        <button onclick="filterTracker('all')" class="tracker-filter-btn active px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white" data-status="all">
+          All (<span id="t-count-all">0</span>)
+        </button>
+        <button onclick="filterTracker('Saved')" class="tracker-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-medium bg-surface-900 border border-slate-800 text-slate-300 hover:text-white" data-status="Saved">
+          🔖 Saved (<span id="t-count-saved">0</span>)
+        </button>
+        <button onclick="filterTracker('Applied')" class="tracker-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-medium bg-surface-900 border border-slate-800 text-slate-300 hover:text-white" data-status="Applied">
+          📨 Applied (<span id="t-count-applied">0</span>)
+        </button>
+        <button onclick="filterTracker('Interview')" class="tracker-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-medium bg-surface-900 border border-slate-800 text-slate-300 hover:text-white" data-status="Interview">
+          🎙️ Interviewing (<span id="t-count-interview">0</span>)
+        </button>
+        <button onclick="filterTracker('Offer')" class="tracker-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-medium bg-surface-900 border border-slate-800 text-slate-300 hover:text-white" data-status="Offer">
+          🏆 Offers (<span id="t-count-offer">0</span>)
+        </button>
+        <button onclick="filterTracker('Rejected')" class="tracker-filter-btn px-3.5 py-1.5 rounded-lg text-xs font-medium bg-surface-900 border border-slate-800 text-slate-300 hover:text-white" data-status="Rejected">
+          ❌ Rejected (<span id="t-count-rejected">0</span>)
+        </button>
+      </div>
+
+      <!-- Tracked Applications List -->
+      <div id="tracked-list" class="space-y-3">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Tracker Empty State -->
+      <div id="tracker-empty" class="hidden py-16 text-center border border-dashed border-slate-800 rounded-2xl bg-surface-900/40">
+        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-800 flex items-center justify-center text-slate-500">
+          <i data-lucide="inbox" class="w-8 h-8"></i>
+        </div>
+        <h3 class="text-base font-semibold text-slate-300">No applications tracked in this view</h3>
+        <p class="text-xs text-slate-500 mt-1">Go to "Find Jobs" and click "Save & Track" on any job card to add it here!</p>
+        <button onclick="switchTab('jobs')" class="mt-4 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-medium transition-all">
+          Explore Jobs Now
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 3: USER PROFILE & PITCH ==================== -->
+    <div id="view-profile" class="hidden space-y-6 max-w-3xl mx-auto">
+      <div class="bg-surface-900 border border-slate-800 p-6 sm:p-8 rounded-2xl shadow-xl">
+        <div class="flex items-center space-x-3 mb-6">
+          <div class="w-10 h-10 rounded-xl bg-brand-600/20 border border-brand-500/30 flex items-center justify-center text-brand-400">
+            <i data-lucide="user" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold text-white">Your Candidate Profile & Quick Pitch</h2>
+            <p class="text-xs text-slate-400">This information automatically customizes your 1-click Cold Emails & Cover Letters.</p>
+          </div>
+        </div>
+
+        <form id="profile-form" onsubmit="saveUserProfile(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Full Name</label>
+              <input type="text" id="prof-name" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Current Title / Focus</label>
+              <input type="text" id="prof-title" placeholder="e.g. AI Engineering Student / Cybersecurity Specialist" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">School / University / Degree</label>
+              <input type="text" id="prof-school" placeholder="e.g. Computer Science Student (ENSIAS / INPT / EMSI / 1337 / YouCode)" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Email Address</label>
+              <input type="email" id="prof-email" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Phone Number (with country code)</label>
+              <input type="text" id="prof-phone" placeholder="+212 6..." class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">Preferred Cover Letter Language</label>
+              <select id="prof-lang" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+                <option value="English">English (Global / Tech Standard)</option>
+                <option value="French">Français (French / Morocco Enterprise Standard)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">GitHub / Portfolio URL</label>
+              <input type="url" id="prof-portfolio" placeholder="https://github.com/..." class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-400 mb-1">LinkedIn Profile URL</label>
+              <input type="url" id="prof-linkedin" placeholder="https://linkedin.com/in/..." class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-400 mb-1">Key Skills & Tech Stack (comma separated)</label>
+            <textarea id="prof-skills" rows="3" placeholder="e.g. Python, PyTorch, LangChain, Fastify, Docker, Linux, Wireshark, React, REST APIs" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 focus:outline-none focus:border-brand-500"></textarea>
+          </div>
+
+          <div class="flex items-center justify-end space-x-3 pt-2">
+            <span id="profile-saved-msg" class="text-xs text-emerald-400 hidden">✓ Profile saved successfully!</span>
+            <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-sm font-semibold transition-all shadow-md shadow-brand-500/20">
+              Save Profile
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ==================== TAB 4: APPLICATION & INTERVIEW TIPS ==================== -->
+    <div id="view-tips" class="hidden space-y-6 max-w-4xl mx-auto">
+      <div class="bg-surface-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+            <i data-lucide="sparkles" class="w-5 h-5 text-amber-400"></i>
+            <span>Guide & Strategy for Tech Internships & Entry-Level Roles</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">Key strategies for landing PFE internships and junior developer / AI / cybersecurity positions.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="p-4 rounded-xl bg-surface-800/60 border border-slate-800 space-y-2">
+            <div class="flex items-center space-x-2 text-brand-400 font-semibold text-sm">
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span>1. Direct Cold Email / LinkedIn Outreach</span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Don't just apply through job buttons! Search for the Engineering Lead, Tech Recruiter, or CTO on LinkedIn. Use the <strong>"Cold Email"</strong> generator button on JobRadar to send them a concise, direct message referencing their specific open role.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-surface-800/60 border border-slate-800 space-y-2">
+            <div class="flex items-center space-x-2 text-emerald-400 font-semibold text-sm">
+              <i data-lucide="code-2" class="w-4 h-4"></i>
+              <span>2. Portfolio & Proof of Work</span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              For AI, Cyber, or Dev roles: 2 deployed, high-quality projects with clean READMEs, live demo links, and Docker files beat 20 generic classroom exercises. Link them directly in your profile.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-surface-800/60 border border-slate-800 space-y-2">
+            <div class="flex items-center space-x-2 text-cyan-400 font-semibold text-sm">
+              <i data-lucide="shield-check" class="w-4 h-4"></i>
+              <span>3. For Cybersecurity Roles</span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Highlight hands-on labs: TryHackMe / HackTheBox rank, write-ups on Medium/GitHub, certifications (e.g. eJPT, Security+, CEH), and practical experience with SIEM (Splunk, Wazuh) or network forensics (Wireshark).
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-surface-800/60 border border-slate-800 space-y-2">
+            <div class="flex items-center space-x-2 text-purple-400 font-semibold text-sm">
+              <i data-lucide="cpu" class="w-4 h-4"></i>
+              <span>4. For AI & Data Engineer Roles</span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">
+              Focus on end-to-end ML pipelines: data ingestion, vector databases (RAG / Pinecone / Chroma), API deployment (FastAPI / Docker), and fine-tuning rather than just running Jupyter notebooks.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== COLD EMAIL / COVER LETTER MODAL ==================== -->
+  <div id="email-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-900 border border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-surface-950/60">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-lg bg-brand-600/20 text-brand-400 flex items-center justify-center">
+            <i data-lucide="mail" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Tailored Cold Email & Cover Letter</h3>
+            <p id="modal-subtitle" class="text-xs text-slate-400">Position at Company</p>
+          </div>
+        </div>
+        <button onclick="closeEmailModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-5 space-y-4 overflow-y-auto flex-1">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-slate-400">Choose Language:</span>
+          <div class="inline-flex rounded-lg bg-surface-800 p-0.5 border border-slate-700">
+            <button onclick="regenerateModalEmail('English')" id="btn-lang-en" class="px-3 py-1 rounded text-xs font-semibold bg-brand-600 text-white">English</button>
+            <button onclick="regenerateModalEmail('French')" id="btn-lang-fr" class="px-3 py-1 rounded text-xs font-medium text-slate-400 hover:text-white">Français</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Subject Line</label>
+          <div class="relative">
+            <input type="text" id="modal-subject" readonly class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200">
+            <button onclick="copyToClipboard('modal-subject', this)" class="absolute right-2 top-2 text-xs px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300">Copy</button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Message Body</label>
+          <div class="relative">
+            <textarea id="modal-body" rows="12" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono text-xs leading-relaxed focus:outline-none focus:border-brand-500"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-slate-800 bg-surface-950/60 flex items-center justify-between">
+        <button onclick="closeEmailModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-white">Cancel</button>
+        <div class="flex items-center space-x-2">
+          <button onclick="copyToClipboard('modal-body', this)" class="px-4 py-2 bg-surface-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 flex items-center space-x-1.5 transition-all">
+            <i data-lucide="copy" class="w-4 h-4"></i>
+            <span>Copy Full Pitch</span>
+          </button>
+          <button onclick="openMailtoClient()" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-md shadow-brand-500/20">
+            <i data-lucide="external-link" class="w-4 h-4"></i>
+            <span>Open in Email App</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CUSTOM PROVIDERS & RSS FEEDS ==================== -->
+  <div id="modal-custom-providers" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+    <div class="bg-surface-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-surface-950/40">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <i data-lucide="rss" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Custom Providers & Feeds</h3>
+            <p class="text-xs text-slate-400">Add any RSS job feed, company careers feed, or JSON API</p>
+          </div>
+        </div>
+        <button onclick="closeCustomProvidersModal()" class="w-8 h-8 rounded-lg bg-surface-800 text-slate-400 hover:text-white flex items-center justify-center transition-all">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-5 space-y-5 overflow-y-auto flex-1">
+        <!-- Quick 1-Click Recommended Feeds -->
+        <div class="space-y-2">
+          <label class="block text-xs font-semibold text-slate-300">⚡ 1-Click Recommended Feeds to Add:</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <button onclick="addPresetFeed('WeWorkRemotely Dev', 'https://weworkremotely.com/categories/remote-programming-jobs.rss')" class="p-2.5 rounded-lg bg-surface-800 hover:bg-slate-700/60 border border-slate-700 text-left transition-all flex items-center justify-between">
+              <div>
+                <span class="font-semibold text-white block">WeWorkRemotely Dev</span>
+                <span class="text-[10px] text-slate-400">Remote programming jobs</span>
+              </div>
+              <span class="text-indigo-400 font-bold text-sm">+</span>
+            </button>
+            <button onclick="addPresetFeed('RemoteOK Tech Feed', 'https://remoteok.com/remote-engineer-jobs.rss')" class="p-2.5 rounded-lg bg-surface-800 hover:bg-slate-700/60 border border-slate-700 text-left transition-all flex items-center justify-between">
+              <div>
+                <span class="font-semibold text-white block">RemoteOK Engineers</span>
+                <span class="text-[10px] text-slate-400">Global remote software roles</span>
+              </div>
+              <span class="text-indigo-400 font-bold text-sm">+</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Active Providers List -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-slate-300">Your Active Custom Providers</label>
+            <span class="text-[11px] text-slate-500">Auto-scanned with every search</span>
+          </div>
+          <div id="custom-providers-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <!-- Dynamically injected -->
+          </div>
+        </div>
+
+        <!-- Add New Provider Form -->
+        <form onsubmit="handleAddCustomProvider(event)" class="bg-surface-950/60 border border-slate-800 rounded-xl p-4 space-y-3">
+          <h4 class="text-xs font-bold text-white flex items-center space-x-1.5">
+            <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-brand-400"></i>
+            <span>Add a New Custom Provider / RSS Feed</span>
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-1">
+              <label class="block text-[11px] font-medium text-slate-400 mb-1">Provider Name</label>
+              <input type="text" id="input-provider-name" placeholder="e.g. My Favorite Job Feed" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500">
+            </div>
+            <div class="sm:col-span-1">
+              <label class="block text-[11px] font-medium text-slate-400 mb-1">Provider Type</label>
+              <select id="select-provider-type" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-xs text-slate-200 focus:outline-none focus:border-brand-500">
+                <option value="rss">RSS / Atom Feed (.rss / .xml)</option>
+                <option value="json">JSON REST API</option>
+              </select>
+            </div>
+            <div class="sm:col-span-1 flex items-end">
+              <button type="submit" class="w-full h-[34px] bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold shadow-md flex items-center justify-center space-x-1 transition-all">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>Add Provider</span>
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-slate-400 mb-1">Feed / API URL</label>
+            <input type="url" id="input-provider-url" placeholder="https://example.com/jobs.rss" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500">
+            <p class="text-[10px] text-slate-500 mt-1">Accepts any standard RSS / Atom XML link or JSON endpoint that returns job items.</p>
+          </div>
+        </form>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-slate-800 bg-surface-950/60 flex items-center justify-end">
+        <button onclick="closeCustomProvidersModal()" class="px-4 py-2 bg-surface-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

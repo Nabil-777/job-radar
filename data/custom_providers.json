@@ -1,0 +1,18 @@
+[
+  {
+    "id": "feed-wwr-dev",
+    "name": "WeWorkRemotely Dev RSS",
+    "type": "rss",
+    "url": "https://weworkremotely.com/categories/remote-programming-jobs.rss",
+    "category": "dev",
+    "active": true
+  },
+  {
+    "id": "feed-remoteok-eng",
+    "name": "RemoteOK Engineer RSS",
+    "type": "rss",
+    "url": "https://remoteok.com/remote-engineer-jobs.rss",
+    "category": "dev",
+    "active": true
+  }
+]
