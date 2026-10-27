@@ -1,5 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { execSync } = require('node:child_process');
+const path = require('node:path');
+
+// Ensure valid secret for unit tests
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-for-unit-testing-32-chars-long';
+
 const bcrypt = require('bcryptjs');
 const { db } = require('../src/db/database');
 const { signUserToken } = require('../src/middleware/auth.middleware');
@@ -49,4 +55,40 @@ test('user registration and profile link in database', () => {
 
   // Clean up test record
   db.prepare('DELETE FROM users WHERE id = ?').run(testUserId);
+});
+
+test('TASK 1 (P0): auth.middleware fails fast if JWT_SECRET is missing or < 32 chars', () => {
+  const rootDir = path.resolve(__dirname, '..');
+
+  // Test missing JWT_SECRET
+  let missingPassed = false;
+  try {
+    execSync('node -e "delete process.env.JWT_SECRET; require(\'./src/middleware/auth.middleware\');"', {
+      cwd: rootDir,
+      stdio: 'pipe',
+      env: { ...process.env, JWT_SECRET: '' }
+    });
+  } catch (err) {
+    const stderr = err.stderr ? err.stderr.toString() : '';
+    assert.match(stderr, /FATAL: JWT_SECRET must be set and ≥32 chars\./);
+    assert.equal(err.status, 1);
+    missingPassed = true;
+  }
+  assert.ok(missingPassed, 'Module load without JWT_SECRET must exit with code 1 and fatal message');
+
+  // Test short JWT_SECRET
+  let shortPassed = false;
+  try {
+    execSync('node -e "require(\'./src/middleware/auth.middleware\');"', {
+      cwd: rootDir,
+      stdio: 'pipe',
+      env: { ...process.env, JWT_SECRET: 'short-secret' }
+    });
+  } catch (err) {
+    const stderr = err.stderr ? err.stderr.toString() : '';
+    assert.match(stderr, /FATAL: JWT_SECRET must be set and ≥32 chars\./);
+    assert.equal(err.status, 1);
+    shortPassed = true;
+  }
+  assert.ok(shortPassed, 'Module load with < 32 chars JWT_SECRET must exit with code 1 and fatal message');
 });

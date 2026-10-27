@@ -90,6 +90,12 @@ app.use((req, res) => {
   res.sendFile('index.html', { root: path.join(__dirname, 'public') });
 });
 
+// Startup Security Validation (P0)
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error('FATAL: JWT_SECRET must be set and ≥32 chars.');
+  process.exit(1);
+}
+
 // Start Server and Background Radar
 app.listen(PORT, () => {
   console.log(`🚀 JobRadar v2.0 running on http://localhost:${PORT}`);

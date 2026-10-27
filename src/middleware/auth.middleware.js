@@ -1,7 +1,12 @@
 const jwt = require('jsonwebtoken');
 const { db } = require('../db/database');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'jobradar-secure-jwt-signature-key-2026';
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error('FATAL: JWT_SECRET must be set and ≥32 chars.');
+  process.exit(1);
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 const TOKEN_EXPIRY = '30d';
 
 function signUserToken(user) {
