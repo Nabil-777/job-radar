@@ -10,3 +10,5 @@ Thumbs.db
 *.db-wal
 *.db-shm
 uploads/
+coverage/
+.nyc_output/

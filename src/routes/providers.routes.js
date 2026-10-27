@@ -66,7 +66,7 @@ router.post('/', (req, res) => {
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: err.errors.map(e => e.message).join(', ') });
+      return res.status(400).json({ success: false, error: (err.issues || err.errors || []).map(e => e.message).join(', ') || err.message });
     }
     res.status(500).json({ success: false, error: err.message });
   }

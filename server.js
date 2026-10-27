@@ -153,14 +153,16 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   process.exit(1);
 }
 
-// Start Server and Background Radar
-app.listen(PORT, () => {
-  console.log(`🚀 JobRadar v2.0 running on http://localhost:${PORT}`);
-  console.log(`📦 SQLite database active at: ${DB_PATH}`);
-  console.log(`🛡️  Security hardening (Helmet + Rate Limiting) enabled`);
+// Start Server and Background Radar only when run directly
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 JobRadar v2.0 running on http://localhost:${PORT}`);
+    console.log(`📦 SQLite database active at: ${DB_PATH}`);
+    console.log(`🛡️  Security hardening (Helmet + Rate Limiting) enabled`);
 
-  // Start background job discovery sweeps
-  startRadarCron(searchJobs);
-});
+    // Start background job discovery sweeps
+    startRadarCron(searchJobs);
+  });
+}
 
 module.exports = app;
