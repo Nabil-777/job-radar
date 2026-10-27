@@ -655,6 +655,21 @@ async function triggerSearch(forceRefresh = false) {
     });
     if (forceRefresh) params.append('refresh', 'true');
 
+    // Date Filtering parameters (Requirement 5)
+    const dateFilterEl = document.getElementById('date-filter');
+    const postedAfterEl = document.getElementById('posted-after');
+    const postedBeforeEl = document.getElementById('posted-before');
+
+    if (dateFilterEl && dateFilterEl.value && dateFilterEl.value !== 'all') {
+      params.append('maxAgeDays', dateFilterEl.value);
+    }
+    if (postedAfterEl && postedAfterEl.value) {
+      params.append('postedAfter', postedAfterEl.value);
+    }
+    if (postedBeforeEl && postedBeforeEl.value) {
+      params.append('postedBefore', postedBeforeEl.value);
+    }
+
     const res = await fetch(`/api/jobs?${params.toString()}`, {
       headers: getAuthHeaders(true)
     });
@@ -783,7 +798,7 @@ function renderJobFeed(jobs) {
         <div class="card-main-meta">
           <div class="card-title-row">
             <h4 class="card-title" title="${job.title}">${job.title}</h4>
-            ${job.isNew ? '<span class="badge-new-dot" title="New unseen opportunity"></span>' : ''}
+            ${(job.isNew && job.dateStatus !== 'unknown') ? '<span class="badge-new-dot" title="New unseen opportunity"></span>' : ''}
           </div>
 
           <div class="card-subtitle-row">
@@ -804,7 +819,12 @@ function renderJobFeed(jobs) {
         <div class="card-right-meta">
           <span class="match-score-pill ${scoreClass}">${score}% MATCH</span>
           <div class="card-time-sources">
-            <span>${formatRelativeTime(job.publishedAt || job.fetchedAt)}</span>
+            ${job.dateStatus === 'unknown'
+              ? '<span class="badge-date-unknown" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:var(--text-muted);background:rgba(148,163,184,0.12);padding:1px 6px;border-radius:4px;">📅 Date unknown</span>'
+              : job.isFresh
+                ? `<span class="badge-date-fresh" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#22c55e;font-weight:500;">🟢 ${job.postedAtLabel || 'Just posted'}</span>`
+                : `<span class="badge-date-normal" style="font-size:11px;color:var(--text-muted);">${job.postedAtLabel || 'Recently'}</span>`
+            }
             <span class="source-badge">${job.source}</span>
           </div>
           <div class="card-hover-actions" onclick="event.stopPropagation()">
@@ -2282,4 +2302,29 @@ function showToast(message, icon = 'info') {
     toast.style.transition = 'all 160ms ease';
     setTimeout(() => toast.remove(), 180);
   }, 2600);
+}
+
+// ==================== DATE FILTER HANDLERS (Requirement 6) ====================
+function onDateFilterChange() {
+  const postedAfterEl = document.getElementById('posted-after');
+  const postedBeforeEl = document.getElementById('posted-before');
+  if (postedAfterEl) postedAfterEl.value = '';
+  if (postedBeforeEl) postedBeforeEl.value = '';
+  triggerSearch();
+}
+
+function onCustomDateRangeChange() {
+  const dateFilterEl = document.getElementById('date-filter');
+  if (dateFilterEl) dateFilterEl.value = 'all';
+  triggerSearch();
+}
+
+function clearDateFilters() {
+  const dateFilterEl = document.getElementById('date-filter');
+  const postedAfterEl = document.getElementById('posted-after');
+  const postedBeforeEl = document.getElementById('posted-before');
+  if (dateFilterEl) dateFilterEl.value = '30';
+  if (postedAfterEl) postedAfterEl.value = '';
+  if (postedBeforeEl) postedBeforeEl.value = '';
+  triggerSearch();
 }

@@ -1,6 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
-const { normalizeDate } = require('../../utils/dateNormalizer');
+const { parsePostedDate, formatPostedDateLabel, isFreshPosting } = require('../../utils/parsePostedDate');
 const { generateFingerprint } = require('../../utils/fingerprint');
 
 const USER_AGENTS = [
@@ -55,7 +55,7 @@ function detectExperienceLevel(title = '', tags = []) {
 }
 
 /**
- * Standard Job Normalizer guaranteeing identical schema across all providers
+ * Standard Job Normalizer guaranteeing identical schema and strict date parsing across all providers
  */
 function createJob(raw = {}) {
   const title = String(raw.title || '').trim();
@@ -63,7 +63,15 @@ function createJob(raw = {}) {
   const location = String(raw.location || 'Remote / Worldwide').trim();
   const url = String(raw.url || '').trim();
   const source = String(raw.source || 'Scraper').trim();
-  const datePosted = normalizeDate(raw.datePosted || raw.publishedAt || raw.created_at || raw.date);
+
+  // Strict Date Resolution: never fall back to now silently
+  const rawDate = raw.date !== undefined ? raw.date : (raw.datePosted !== undefined ? raw.datePosted : (raw.publishedAt || raw.published_at || raw.created_at || raw.postedAt || null));
+  const parsedDate = parsePostedDate(rawDate);
+  const postedAt = parsedDate ? parsedDate.toISOString() : null;
+  const dateStatus = parsedDate ? 'parsed' : 'unknown';
+  const isFresh = isFreshPosting(parsedDate);
+  const postedAtLabel = formatPostedDateLabel(parsedDate);
+
   const isRemote = Boolean(raw.remote || raw.isRemote || location.toLowerCase().includes('remote'));
   const tags = Array.isArray(raw.tags)
     ? raw.tags.map(t => String(t).trim()).filter(Boolean)
@@ -86,7 +94,13 @@ function createJob(raw = {}) {
     company,
     location,
     url,
-    datePosted,
+    postedAt,
+    datePosted: postedAt || '',
+    publishedAt: postedAt || '',
+    dateRaw: rawDate != null ? String(rawDate) : null,
+    dateStatus,
+    isFresh,
+    postedAtLabel,
     logo: raw.logo || '',
     source,
     experienceLevel: raw.experienceLevel || detectExperienceLevel(title, tags),

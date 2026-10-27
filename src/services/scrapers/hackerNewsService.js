@@ -24,7 +24,7 @@ async function searchHackerNews({ keywords = '', experienceLevel = 'all', limit 
         company: parts[0] || 'Tech Startup (YC)',
         location: parts[2] || 'Remote / Hybrid',
         url: `https://news.ycombinator.com/item?id=${c.id}`,
-        datePosted: c.time ? new Date(c.time * 1000).toISOString() : new Date().toISOString(),
+        date: c.time ? c.time * 1000 : null,
         remote: (parts[2] || '').toLowerCase().includes('remote') || rawText.toLowerCase().includes('remote'),
         tags: ['y-combinator', 'who-is-hiring', 'tech'],
         descriptionSnippet: rawText.slice(0, 260)

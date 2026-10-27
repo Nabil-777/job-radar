@@ -22,7 +22,7 @@ async function searchArbeitnow({ keywords = '', experienceLevel = 'all', limit =
         company: item.company_name || 'Tech Company',
         location: item.location || (item.remote ? 'Remote' : 'Europe'),
         url: item.url,
-        datePosted: item.created_at ? new Date(item.created_at * 1000).toISOString() : new Date().toISOString(),
+        date: item.created_at ? item.created_at * 1000 : null,
         remote: item.remote || false,
         tags: item.tags || [],
         descriptionSnippet: item.description || ''

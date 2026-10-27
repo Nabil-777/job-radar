@@ -211,6 +211,28 @@
             </div>
           </div>
 
+          <!-- Date & Freshness Filtering Bar (Requirement 6) -->
+          <div class="date-filter-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0 14px 0; padding: 10px 14px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <i data-lucide="calendar" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Date Posted:</span>
+              <select id="date-filter" onchange="onDateFilterChange()" class="select-field" style="padding: 4px 10px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-primary); cursor: pointer;">
+                <option value="7">Last 7 days</option>
+                <option value="30" selected>Last 30 days</option>
+                <option value="90">Last 90 days</option>
+                <option value="all">Any time</option>
+              </select>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-muted);">
+              <span>From</span>
+              <input type="date" id="posted-after" onchange="onCustomDateRangeChange()" style="padding: 3px 8px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-primary);">
+              <span>To</span>
+              <input type="date" id="posted-before" onchange="onCustomDateRangeChange()" style="padding: 3px 8px; font-size: 11.5px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-primary);">
+              <button onclick="clearDateFilters()" class="btn-secondary" style="padding: 3px 8px; font-size: 11px; margin-left: 4px; cursor: pointer;">Clear</button>
+            </div>
+          </div>
+
           <!-- Skeletons (Initial loading) -->
           <div id="loading-skeletons" style="display: flex; flex-direction: column; gap: 6px;">
             <div class="skeleton-row shimmer-anim"><div class="skeleton-box" style="width: 36px; height: 36px;"></div><div class="skeleton-box" style="height: 18px; width: 60%;"></div><div class="skeleton-box" style="height: 18px; width: 70px;"></div></div>

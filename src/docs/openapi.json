@@ -20,18 +20,41 @@
     }
   ],
   "tags": [
-    { "name": "System", "description": "Platform health and presets" },
-    { "name": "Auth", "description": "User authentication and session management" },
-    { "name": "Jobs", "description": "Aggregated job search and matching engine" },
-    { "name": "Applications", "description": "Kanban application tracking pipeline" },
-    { "name": "Profile", "description": "Candidate profile, CV parsing, and structured resume" },
-    { "name": "Providers", "description": "Custom RSS/JSON job providers and observability" },
-    { "name": "AI Studio", "description": "Cover letter generator and tailored resume studio" }
+    {
+      "name": "System",
+      "description": "Platform health and presets"
+    },
+    {
+      "name": "Auth",
+      "description": "User authentication and session management"
+    },
+    {
+      "name": "Jobs",
+      "description": "Aggregated job search and matching engine"
+    },
+    {
+      "name": "Applications",
+      "description": "Kanban application tracking pipeline"
+    },
+    {
+      "name": "Profile",
+      "description": "Candidate profile, CV parsing, and structured resume"
+    },
+    {
+      "name": "Providers",
+      "description": "Custom RSS/JSON job providers and observability"
+    },
+    {
+      "name": "AI Studio",
+      "description": "Cover letter generator and tailored resume studio"
+    }
   ],
   "paths": {
     "/api/health": {
       "get": {
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Check API health",
         "description": "Returns current service health, uptime, and database connection state.",
         "responses": {
@@ -39,7 +62,9 @@
             "description": "Healthy response",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/HealthResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
               }
             }
           }
@@ -48,7 +73,9 @@
     },
     "/api/health/scrapers": {
       "get": {
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Get scraper circuit breaker health",
         "description": "Returns status matrix of all 19+ built-in scrapers with circuit breaker states.",
         "responses": {
@@ -56,7 +83,9 @@
             "description": "Scraper health matrix",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ScraperHealthResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ScraperHealthResponse"
+                }
               }
             }
           }
@@ -65,7 +94,9 @@
     },
     "/api/presets": {
       "get": {
-        "tags": ["System"],
+        "tags": [
+          "System"
+        ],
         "summary": "Get search domain presets",
         "description": "Returns domain shortcuts (AI, Fullstack, DevOps, Security, Internships).",
         "responses": {
@@ -73,7 +104,9 @@
             "description": "Domain presets object",
             "content": {
               "application/json": {
-                "schema": { "type": "object" }
+                "schema": {
+                  "type": "object"
+                }
               }
             }
           }
@@ -82,13 +115,17 @@
     },
     "/api/auth/signup": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Create new user account",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/SignupRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
+              }
             }
           }
         },
@@ -97,24 +134,34 @@
             "description": "Account created successfully",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/AuthSuccessResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
               }
             }
           },
-          "400": { "description": "Validation error" },
-          "409": { "description": "Email already registered" }
+          "400": {
+            "description": "Validation error"
+          },
+          "409": {
+            "description": "Email already registered"
+          }
         }
       }
     },
     "/api/auth/login": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Sign in with email and password",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/LoginRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
             }
           }
         },
@@ -123,42 +170,60 @@
             "description": "Sign in successful",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/AuthSuccessResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
               }
             }
           },
-          "401": { "description": "Invalid credentials" }
+          "401": {
+            "description": "Invalid credentials"
+          }
         }
       }
     },
     "/api/auth/me": {
       "get": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Get current authenticated user",
-        "security": [{ "BearerAuth": [] }],
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Current user and linked profile",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/UserMeResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/UserMeResponse"
+                }
               }
             }
           },
-          "401": { "description": "Unauthorized" }
+          "401": {
+            "description": "Unauthorized"
+          }
         }
       }
     },
     "/api/auth/demo": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Instant 1-click guest / demo login",
         "responses": {
           "200": {
             "description": "Demo account token and profile",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/AuthSuccessResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
               }
             }
           }
@@ -167,14 +232,26 @@
     },
     "/api/auth/logout": {
       "post": {
-        "tags": ["Auth"],
+        "tags": [
+          "Auth"
+        ],
         "summary": "Log out session",
         "responses": {
           "200": {
             "description": "Logged out successfully",
             "content": {
               "application/json": {
-                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "message": { "type": "string" } } }
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
               }
             }
           }
@@ -183,21 +260,108 @@
     },
     "/api/jobs": {
       "get": {
-        "tags": ["Jobs"],
+        "tags": [
+          "Jobs"
+        ],
         "summary": "Search aggregated jobs with match scores",
         "parameters": [
-          { "name": "keywords", "in": "query", "schema": { "type": "string" }, "description": "Search terms (e.g. React, Python)" },
-          { "name": "location", "in": "query", "schema": { "type": "string" }, "description": "Location (e.g. Morocco, Casablanca, Remote)" },
-          { "name": "experienceLevel", "in": "query", "schema": { "type": "string", "enum": ["all", "internship", "entry", "senior"] } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
-          { "name": "refresh", "in": "query", "schema": { "type": "boolean", "default": false } }
+          {
+            "name": "keywords",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search terms (e.g. React, Python)"
+          },
+          {
+            "name": "location",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Location (e.g. Morocco, Casablanca, Remote)"
+          },
+          {
+            "name": "experienceLevel",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "internship",
+                "entry",
+                "senior"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "refresh",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          {
+            "name": "postedAfter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Filter jobs posted on or after this ISO date or YYYY-MM-DD"
+          },
+          {
+            "name": "postedBefore",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Filter jobs posted on or before this ISO date or YYYY-MM-DD"
+          },
+          {
+            "name": "maxAgeDays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Filter jobs posted within maximum days (e.g. 7, 30, 90)"
+          },
+          {
+            "name": "dateStatus",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "parsed",
+                "unknown",
+                "all"
+              ]
+            },
+            "description": "Filter by date resolution status"
+          }
         ],
         "responses": {
           "200": {
             "description": "Job listings with AI match scores",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/JobsSearchResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/JobsSearchResponse"
+                }
               }
             }
           }
@@ -206,7 +370,9 @@
     },
     "/api/jobs/refresh": {
       "post": {
-        "tags": ["Jobs"],
+        "tags": [
+          "Jobs"
+        ],
         "summary": "Force scrape fresh jobs across boards",
         "requestBody": {
           "content": {
@@ -214,42 +380,58 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "domain": { "type": "string" },
-                  "keywords": { "type": "string" },
-                  "location": { "type": "string" }
+                  "domain": {
+                    "type": "string"
+                  },
+                  "keywords": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Scrape refreshed" }
+          "200": {
+            "description": "Scrape refreshed"
+          }
         }
       }
     },
     "/api/applications": {
       "get": {
-        "tags": ["Applications"],
+        "tags": [
+          "Applications"
+        ],
         "summary": "List tracked Kanban applications",
         "responses": {
           "200": {
             "description": "List of applications",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ApplicationsListResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationsListResponse"
+                }
               }
             }
           }
         }
       },
       "post": {
-        "tags": ["Applications"],
+        "tags": [
+          "Applications"
+        ],
         "summary": "Add job to Kanban application tracker",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateApplicationRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplicationRequest"
+              }
             }
           }
         },
@@ -258,20 +440,33 @@
             "description": "Application tracked successfully",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ApplicationItem" }
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationItem"
+                }
               }
             }
           },
-          "400": { "description": "Validation error" }
+          "400": {
+            "description": "Validation error"
+          }
         }
       }
     },
     "/api/applications/{id}": {
       "patch": {
-        "tags": ["Applications"],
+        "tags": [
+          "Applications"
+        ],
         "summary": "Update application status or notes",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -280,40 +475,77 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "status": { "type": "string", "enum": ["Saved", "Applied", "Technical_Test", "Interview", "Offer", "Rejected"] },
-                  "notes": { "type": "string" },
-                  "follow_up_at": { "type": "string" }
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "Saved",
+                      "Applied",
+                      "Technical_Test",
+                      "Interview",
+                      "Offer",
+                      "Rejected"
+                    ]
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "follow_up_at": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Application updated" },
-          "404": { "description": "Application not found" }
+          "200": {
+            "description": "Application updated"
+          },
+          "404": {
+            "description": "Application not found"
+          }
         }
       },
       "delete": {
-        "tags": ["Applications"],
+        "tags": [
+          "Applications"
+        ],
         "summary": "Delete tracked application",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Application deleted" },
-          "404": { "description": "Application not found" }
+          "200": {
+            "description": "Application deleted"
+          },
+          "404": {
+            "description": "Application not found"
+          }
         }
       }
     },
     "/api/applications/export/csv": {
       "get": {
-        "tags": ["Applications"],
+        "tags": [
+          "Applications"
+        ],
         "summary": "Export tracked applications as CSV file",
         "responses": {
           "200": {
             "description": "CSV attachment",
             "content": {
-              "text/csv": { "schema": { "type": "string" } }
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           }
         }
@@ -321,38 +553,50 @@
     },
     "/api/profile": {
       "get": {
-        "tags": ["Profile"],
+        "tags": [
+          "Profile"
+        ],
         "summary": "Get candidate profile and skills",
         "responses": {
           "200": {
             "description": "Candidate profile",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ProfileResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
               }
             }
           }
         }
       },
       "post": {
-        "tags": ["Profile"],
+        "tags": [
+          "Profile"
+        ],
         "summary": "Update candidate profile and target skills",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/UpdateProfileRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
             }
           }
         },
         "responses": {
-          "200": { "description": "Profile updated" }
+          "200": {
+            "description": "Profile updated"
+          }
         }
       }
     },
     "/api/profile/upload-cv": {
       "post": {
-        "tags": ["Profile"],
+        "tags": [
+          "Profile"
+        ],
         "summary": "Upload and parse PDF CV",
         "requestBody": {
           "required": true,
@@ -361,87 +605,138 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "cv": { "type": "string", "format": "binary" }
+                  "cv": {
+                    "type": "string",
+                    "format": "binary"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "CV parsed and structured profile generated" },
-          "400": { "description": "No file uploaded" },
-          "422": { "description": "Scanned PDF without selectable text" }
+          "200": {
+            "description": "CV parsed and structured profile generated"
+          },
+          "400": {
+            "description": "No file uploaded"
+          },
+          "422": {
+            "description": "Scanned PDF without selectable text"
+          }
         }
       }
     },
     "/api/providers": {
       "get": {
-        "tags": ["Providers"],
+        "tags": [
+          "Providers"
+        ],
         "summary": "List custom RSS/JSON providers",
         "responses": {
           "200": {
             "description": "Providers list",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ProvidersListResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/ProvidersListResponse"
+                }
               }
             }
           }
         }
       },
       "post": {
-        "tags": ["Providers"],
+        "tags": [
+          "Providers"
+        ],
         "summary": "Add custom RSS or JSON provider",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/CreateProviderRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/CreateProviderRequest"
+              }
             }
           }
         },
         "responses": {
-          "201": { "description": "Provider created" },
-          "400": { "description": "Invalid provider URL or name" }
+          "201": {
+            "description": "Provider created"
+          },
+          "400": {
+            "description": "Invalid provider URL or name"
+          }
         }
       }
     },
     "/api/providers/{id}/toggle": {
       "patch": {
-        "tags": ["Providers"],
+        "tags": [
+          "Providers"
+        ],
         "summary": "Toggle active state of custom provider",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Provider toggled" },
-          "404": { "description": "Provider not found" }
+          "200": {
+            "description": "Provider toggled"
+          },
+          "404": {
+            "description": "Provider not found"
+          }
         }
       }
     },
     "/api/providers/{id}": {
       "delete": {
-        "tags": ["Providers"],
+        "tags": [
+          "Providers"
+        ],
         "summary": "Delete custom provider",
         "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Provider deleted" },
-          "404": { "description": "Provider not found" }
+          "200": {
+            "description": "Provider deleted"
+          },
+          "404": {
+            "description": "Provider not found"
+          }
         }
       }
     },
     "/api/providers/health": {
       "get": {
-        "tags": ["Providers"],
+        "tags": [
+          "Providers"
+        ],
         "summary": "Get live health metrics of all providers",
         "responses": {
           "200": {
             "description": "Provider health metrics summary",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ProviderHealthSummary" }
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderHealthSummary"
+                }
               }
             }
           }
@@ -450,14 +745,18 @@
     },
     "/api/ai/pitch": {
       "post": {
-        "tags": ["AI Studio"],
+        "tags": [
+          "AI Studio"
+        ],
         "summary": "Generate 4-in-1 tailored application outreach",
         "description": "Produces personalized Cover Letter, LinkedIn Connection Note, Cold Email, and CV Highlight Tips.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/AIPitchRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/AIPitchRequest"
+              }
             }
           }
         },
@@ -466,7 +765,9 @@
             "description": "Generated outreach kit",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/AIPitchResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/AIPitchResponse"
+                }
               }
             }
           }
@@ -475,13 +776,17 @@
     },
     "/api/ai/tailored-cv": {
       "post": {
-        "tags": ["AI Studio"],
+        "tags": [
+          "AI Studio"
+        ],
         "summary": "Generate ATS-tailored A4 Resume",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/TailoredCvRequest" }
+              "schema": {
+                "$ref": "#/components/schemas/TailoredCvRequest"
+              }
             }
           }
         },
@@ -490,7 +795,9 @@
             "description": "Structured tailored resume and print-ready HTML",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/TailoredCvResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/TailoredCvResponse"
+                }
               }
             }
           }
@@ -510,48 +817,104 @@
       "HealthResponse": {
         "type": "object",
         "properties": {
-          "status": { "type": "string", "example": "healthy" },
-          "version": { "type": "string", "example": "2.0.0" },
-          "uptime": { "type": "number", "example": 124.5 },
-          "database": { "type": "string", "example": "connected" },
-          "timestamp": { "type": "string", "format": "date-time" }
+          "status": {
+            "type": "string",
+            "example": "healthy"
+          },
+          "version": {
+            "type": "string",
+            "example": "2.0.0"
+          },
+          "uptime": {
+            "type": "number",
+            "example": 124.5
+          },
+          "database": {
+            "type": "string",
+            "example": "connected"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "ScraperHealthResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
-          "matrix": { "type": "object" }
+          "success": {
+            "type": "boolean"
+          },
+          "matrix": {
+            "type": "object"
+          }
         }
       },
       "SignupRequest": {
         "type": "object",
-        "required": ["email", "password", "fullName"],
+        "required": [
+          "email",
+          "password",
+          "fullName"
+        ],
         "properties": {
-          "email": { "type": "string", "format": "email", "example": "dev@jobradar.local" },
-          "password": { "type": "string", "minLength": 8, "example": "SecretPass123!" },
-          "fullName": { "type": "string", "example": "Nabil Baghoughi" }
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "dev@jobradar.local"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "example": "SecretPass123!"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Nabil Baghoughi"
+          }
         }
       },
       "LoginRequest": {
         "type": "object",
-        "required": ["email", "password"],
+        "required": [
+          "email",
+          "password"
+        ],
         "properties": {
-          "email": { "type": "string", "format": "email", "example": "dev@jobradar.local" },
-          "password": { "type": "string", "example": "SecretPass123!" }
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "dev@jobradar.local"
+          },
+          "password": {
+            "type": "string",
+            "example": "SecretPass123!"
+          }
         }
       },
       "AuthSuccessResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean", "example": true },
-          "token": { "type": "string", "example": "eyJhbGciOiJIUzI1NiIsIn..." },
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "token": {
+            "type": "string",
+            "example": "eyJhbGciOiJIUzI1NiIsIn..."
+          },
           "user": {
             "type": "object",
             "properties": {
-              "id": { "type": "string" },
-              "email": { "type": "string" },
-              "fullName": { "type": "string" }
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "fullName": {
+                "type": "string"
+              }
             }
           }
         }
@@ -559,149 +922,320 @@
       "UserMeResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
-          "user": { "type": "object" },
-          "profile": { "type": "object" }
+          "success": {
+            "type": "boolean"
+          },
+          "user": {
+            "type": "object"
+          },
+          "profile": {
+            "type": "object"
+          }
         }
       },
       "JobsSearchResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
+          "success": {
+            "type": "boolean"
+          },
           "jobs": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/JobItem" }
+            "items": {
+              "$ref": "#/components/schemas/JobItem"
+            }
           },
-          "stats": { "type": "object" },
-          "fromCache": { "type": "boolean" }
+          "stats": {
+            "type": "object"
+          },
+          "fromCache": {
+            "type": "boolean"
+          }
         }
       },
       "JobItem": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "company": { "type": "string" },
-          "location": { "type": "string" },
-          "url": { "type": "string" },
-          "source": { "type": "string" },
-          "datePosted": { "type": "string" },
-          "matchScore": { "type": "integer", "example": 85 },
-          "matchedSkills": { "type": "array", "items": { "type": "string" } },
-          "missingSkills": { "type": "array", "items": { "type": "string" } }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "datePosted": {
+            "type": "string"
+          },
+          "matchScore": {
+            "type": "integer",
+            "example": 85
+          },
+          "matchedSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "missingSkills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       },
       "CreateApplicationRequest": {
         "type": "object",
-        "required": ["company"],
+        "required": [
+          "company"
+        ],
         "properties": {
-          "title": { "type": "string" },
-          "company": { "type": "string" },
-          "location": { "type": "string" },
-          "url": { "type": "string" },
-          "source": { "type": "string" },
-          "status": { "type": "string", "enum": ["Saved", "Applied", "Technical_Test", "Interview", "Offer", "Rejected"] },
-          "notes": { "type": "string" }
+          "title": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Saved",
+              "Applied",
+              "Technical_Test",
+              "Interview",
+              "Offer",
+              "Rejected"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
         }
       },
       "ApplicationsListResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
+          "success": {
+            "type": "boolean"
+          },
           "applications": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/ApplicationItem" }
+            "items": {
+              "$ref": "#/components/schemas/ApplicationItem"
+            }
           }
         }
       },
       "ApplicationItem": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "company": { "type": "string" },
-          "location": { "type": "string" },
-          "status": { "type": "string" },
-          "notes": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
         }
       },
       "ProfileResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
-          "profile": { "type": "object" }
+          "success": {
+            "type": "boolean"
+          },
+          "profile": {
+            "type": "object"
+          }
         }
       },
       "UpdateProfileRequest": {
         "type": "object",
         "properties": {
-          "fullName": { "type": "string" },
-          "title": { "type": "string" },
-          "email": { "type": "string" },
-          "phone": { "type": "string" },
-          "location": { "type": "string" },
-          "skills": { "type": "array", "items": { "type": "string" } }
+          "fullName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       },
       "ProvidersListResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
-          "providers": { "type": "array", "items": { "type": "object" } }
+          "success": {
+            "type": "boolean"
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
         }
       },
       "CreateProviderRequest": {
         "type": "object",
-        "required": ["name", "url"],
+        "required": [
+          "name",
+          "url"
+        ],
         "properties": {
-          "name": { "type": "string" },
-          "url": { "type": "string", "format": "uri" },
-          "type": { "type": "string", "enum": ["rss", "json", "html"] },
-          "category": { "type": "string" }
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "rss",
+              "json",
+              "html"
+            ]
+          },
+          "category": {
+            "type": "string"
+          }
         }
       },
       "ProviderHealthSummary": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
-          "health": { "type": "object" }
+          "success": {
+            "type": "boolean"
+          },
+          "health": {
+            "type": "object"
+          }
         }
       },
       "AIPitchRequest": {
         "type": "object",
         "properties": {
-          "jobTitle": { "type": "string" },
-          "company": { "type": "string" },
-          "location": { "type": "string" },
-          "language": { "type": "string", "default": "English" },
-          "customNotes": { "type": "string" }
+          "jobTitle": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string",
+            "default": "English"
+          },
+          "customNotes": {
+            "type": "string"
+          }
         }
       },
       "AIPitchResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
-          "coverLetter": { "type": "string" },
-          "linkedinNote": { "type": "string" },
-          "coldEmail": { "type": "string" },
-          "cvTips": { "type": "array", "items": { "type": "string" } }
+          "success": {
+            "type": "boolean"
+          },
+          "coverLetter": {
+            "type": "string"
+          },
+          "linkedinNote": {
+            "type": "string"
+          },
+          "coldEmail": {
+            "type": "string"
+          },
+          "cvTips": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       },
       "TailoredCvRequest": {
         "type": "object",
         "properties": {
-          "job": { "type": "object" },
-          "template": { "type": "string", "enum": ["jake-ats", "morocco-pfe", "modern-split"] },
-          "language": { "type": "string" }
+          "job": {
+            "type": "object"
+          },
+          "template": {
+            "type": "string",
+            "enum": [
+              "jake-ats",
+              "morocco-pfe",
+              "modern-split"
+            ]
+          },
+          "language": {
+            "type": "string"
+          }
         }
       },
       "TailoredCvResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
-          "tailoredResumeJson": { "type": "object" },
-          "renderedHtml": { "type": "string" },
-          "atsAnalysis": { "type": "object" }
+          "success": {
+            "type": "boolean"
+          },
+          "tailoredResumeJson": {
+            "type": "object"
+          },
+          "renderedHtml": {
+            "type": "string"
+          },
+          "atsAnalysis": {
+            "type": "object"
+          }
         }
       }
     }

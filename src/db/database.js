@@ -46,6 +46,10 @@ function initSchema() {
       source TEXT,
       fingerprint TEXT UNIQUE,
       published_at TEXT,
+      posted_at TEXT,
+      date_raw TEXT,
+      date_status TEXT DEFAULT 'unknown',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       fetched_at TEXT,
       match_score INTEGER DEFAULT 0,
       is_new INTEGER DEFAULT 1
@@ -131,13 +135,67 @@ function initSchema() {
     db.prepare("ALTER TABLE user_profile ADD COLUMN structured_cv_json TEXT").run();
   } catch (e) {}
 
-  // Safe index creation
+  // Safe migration of jobs table for date accuracy columns
+  try {
+    db.prepare("ALTER TABLE jobs ADD COLUMN posted_at TEXT").run();
+  } catch (e) {}
+
+  try {
+    db.prepare("ALTER TABLE jobs ADD COLUMN date_raw TEXT").run();
+  } catch (e) {}
+
+  try {
+    db.prepare("ALTER TABLE jobs ADD COLUMN date_status TEXT DEFAULT 'unknown'").run();
+  } catch (e) {}
+
+  try {
+    db.prepare("ALTER TABLE jobs ADD COLUMN created_at TEXT").run();
+  } catch (e) {}
+
+  // Safe index creation (after columns exist)
   try {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_id)").run();
   } catch (e) {}
 
   try {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_profile_user ON user_profile(user_id)").run();
+  } catch (e) {}
+
+  try {
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_jobs_posted_at ON jobs(posted_at)").run();
+  } catch (e) {}
+
+  try {
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_jobs_date_status ON jobs(date_status)").run();
+  } catch (e) {}
+
+  // Backfill posted_at from published_at where available
+  try {
+    db.prepare("UPDATE jobs SET posted_at = published_at WHERE posted_at IS NULL AND published_at IS NOT NULL").run();
+  } catch (e) {}
+
+  // Backfill created_at from fetched_at where available
+  try {
+    db.prepare("UPDATE jobs SET created_at = fetched_at WHERE created_at IS NULL AND fetched_at IS NOT NULL").run();
+  } catch (e) {}
+
+  // Backfill migration: Mark jobs where posted_at is suspiciously close to created_at (< 60s) AND date_raw IS NULL
+  try {
+    db.prepare(`
+      UPDATE jobs
+      SET posted_at = NULL,
+          published_at = NULL,
+          date_status = 'unknown'
+      WHERE posted_at IS NOT NULL
+        AND created_at IS NOT NULL
+        AND ABS(strftime('%s', posted_at) - strftime('%s', created_at)) < 60
+        AND date_raw IS NULL
+    `).run();
+  } catch (e) {}
+
+  // Mark existing records with verified posted_at as 'parsed'
+  try {
+    db.prepare("UPDATE jobs SET date_status = 'parsed' WHERE posted_at IS NOT NULL AND date_status = 'unknown'").run();
   } catch (e) {}
 }
 

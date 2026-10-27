@@ -21,7 +21,7 @@ async function searchYCJobs({ keywords = '', experienceLevel = 'all', limit = 15
         company: 'Y Combinator Startup',
         location: title.toLowerCase().includes('remote') ? 'Remote (Worldwide)' : 'US / Remote',
         url: item.url || `https://news.ycombinator.com/item?id=${item.id}`,
-        datePosted: item.time ? new Date(item.time * 1000).toISOString() : new Date().toISOString(),
+        date: item.time ? item.time * 1000 : null,
         remote: title.toLowerCase().includes('remote'),
         tags: ['y-combinator', 'startup']
       });
