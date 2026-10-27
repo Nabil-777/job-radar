@@ -60,15 +60,38 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
 }));
 
-// Rate Limiting (500 requests per 15 minutes per IP)
-const limiter = rateLimit({
+// Rate Limiting (P0 Task 5: Tighten Rate Limiting)
+// 1. Global API Rate Limiter (100 req / 15 min per IP)
+const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 500,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many requests, please try again later.' }
+  message: { error: 'Too many requests, please try again later.' }
 });
-app.use('/api/', limiter);
+
+// 2. Strict Auth Limiter (10 req / 15 min per IP)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many authentication attempts, please try again later.' }
+});
+
+// 3. AI Generation Limiter (20 req / hour per IP)
+const aiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many AI generation requests, please try again later.' }
+});
+
+app.use('/api/', globalLimiter);
+app.use('/api/auth/', authLimiter);
+app.use('/api/ai/', aiLimiter);
+app.use('/api/cover-letter/', aiLimiter);
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
@@ -115,7 +138,7 @@ app.use((req, res, next) => {
 // Centralized Error Handling Middleware (P0 Task 4: Sanitize Error Responses)
 app.use(errorHandler);
 
-// Startup Security Validation (P0)
+// Startup Security Validation (P0 Task 1: JWT Secret)
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   console.error('FATAL: JWT_SECRET must be set and ≥32 chars.');
   process.exit(1);
