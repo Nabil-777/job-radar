@@ -14,6 +14,9 @@ runMigration();
 const { searchJobs, DOMAIN_PRESETS } = require('./services/aggregator');
 const { startRadarCron } = require('./src/jobs/radarCron');
 
+// Middleware
+const { requestIdMiddleware, errorHandler } = require('./src/middleware/error.middleware');
+
 // Modular Route Controllers
 const authRoutes = require('./src/routes/auth.routes');
 const jobsRoutes = require('./src/routes/jobs.routes');
@@ -24,6 +27,9 @@ const aiRoutes = require('./src/routes/ai.routes');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+// Request ID tracking
+app.use(requestIdMiddleware);
 
 // Security Middleware (P0 Task 3: Content Security Policy)
 app.use(helmet({
@@ -98,22 +104,16 @@ app.get('/api/export/applications', (req, res) => {
   res.redirect('/api/applications/export/csv');
 });
 
-// Centralized Error Handling Middleware
-app.use((err, req, res, next) => {
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({ success: false, error: 'Not allowed by CORS' });
+// SPA Fallback
+app.use((req, res, next) => {
+  if (req.method === 'GET' && !req.path.startsWith('/api')) {
+    return res.sendFile('index.html', { root: path.join(__dirname, 'public') });
   }
-  console.error('[Unhandled Error]:', err);
-  res.status(err.status || 500).json({
-    success: false,
-    error: err.message || 'Internal Server Error'
-  });
+  next();
 });
 
-// SPA Fallback
-app.use((req, res) => {
-  res.sendFile('index.html', { root: path.join(__dirname, 'public') });
-});
+// Centralized Error Handling Middleware (P0 Task 4: Sanitize Error Responses)
+app.use(errorHandler);
 
 // Startup Security Validation (P0)
 if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
