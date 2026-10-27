@@ -56,7 +56,8 @@ export async function fetchJobs(filters: JobFilterParams = {}): Promise<{ jobs: 
 	});
 	if (!res.ok) throw new Error('Failed to fetch jobs');
 	const data = await res.json();
-	return { jobs: data.jobs || [], total: data.total || (data.jobs ? data.jobs.length : 0) };
+	const total = data.stats?.total ?? data.total ?? (data.jobs ? data.jobs.length : 0);
+	return { jobs: data.jobs || [], total };
 }
 
 export async function triggerRadarSweep(force = true): Promise<{ count: number }> {
