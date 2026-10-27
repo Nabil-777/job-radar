@@ -10,8 +10,9 @@ const { db, DB_PATH } = require('./src/db/database');
 const { runMigration } = require('./src/db/migrateJson');
 runMigration();
 
-// Aggregator & Cron
+// Aggregator & Cron & Scraper Health
 const { searchJobs, DOMAIN_PRESETS } = require('./src/services/aggregator');
+const { scraperHealthService } = require('./src/services/scraperHealthService');
 const { startRadarCron } = require('./src/jobs/radarCron');
 
 // Middleware
@@ -115,6 +116,14 @@ app.get('/api/health', (req, res) => {
     uptime: process.uptime(),
     database: 'connected',
     timestamp: new Date().toISOString()
+  });
+});
+
+// Scraper Circuit Breaker Health Endpoint (P1 Task 7)
+app.get('/api/health/scrapers', (req, res) => {
+  res.json({
+    success: true,
+    matrix: scraperHealthService.getHealthMatrix()
   });
 });
 

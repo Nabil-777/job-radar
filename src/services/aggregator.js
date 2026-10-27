@@ -18,6 +18,7 @@ const { searchArbeitnow } = require('./scrapers/arbeitnowService');
 const { searchHackerNews } = require('./scrapers/hackerNewsService');
 const { searchEmploiMa } = require('./scrapers/emploiMaService');
 const { searchCustomProviders } = require('./customProvidersService');
+const { scraperHealthService } = require('./scraperHealthService');
 const { generateFingerprint } = require('../utils/fingerprint');
 const { db } = require('../db/database');
 
@@ -47,15 +48,21 @@ function recordHealth(providerName, status, jobsCount, latencyMs, errorMessage =
 }
 
 async function wrapProvider(name, fn) {
+  if (!scraperHealthService.shouldExecute(name)) {
+    return [];
+  }
+
   const start = Date.now();
   try {
     const jobs = await fn();
     const duration = Date.now() - start;
+    scraperHealthService.recordSuccess(name, duration, (jobs || []).length);
     recordHealth(name, 'ok', (jobs || []).length, duration);
     return jobs || [];
   } catch (err) {
     const duration = Date.now() - start;
-    recordHealth(name, 'failed', 0, duration, err.message);
+    scraperHealthService.recordFailure(name, duration, err);
+    recordHealth(name, 'degraded', 0, duration, err.message);
     return [];
   }
 }
