@@ -1,3 +1,4 @@
+const { logger } = require('../utils/logger');
 const cron = require('node-cron');
 const { db } = require('../db/database');
 const { broadcastJobAlert } = require('../services/notificationService');
@@ -8,10 +9,10 @@ function startRadarCron(aggregatorSearchFn) {
   if (cronTask) return;
 
   const scheduleExpression = process.env.RADAR_CRON_SCHEDULE || '0 */2 * * *'; // default every 2 hours
-  console.log(`[Radar Cron] Starting background job scanner with schedule "${scheduleExpression}"...`);
+  logger.info(`[Radar Cron] Starting background job scanner with schedule "${scheduleExpression}"...`);
 
   cronTask = cron.schedule(scheduleExpression, async () => {
-    console.log('[Radar Cron] Sweeping platforms for newly posted internships & jobs...');
+    logger.info('[Radar Cron] Sweeping platforms for newly posted internships & jobs...');
     try {
       // Get user profile for match scoring
       const profile = db.prepare('SELECT * FROM user_profile WHERE id = ?').get('default');
@@ -73,9 +74,9 @@ function startRadarCron(aggregatorSearchFn) {
       });
 
       const newCount = insertCronJobsBatch(searchResult.jobs);
-      console.log(`[Radar Cron] Sweep completed. Discovered ${newCount} brand-new job postings.`);
+      logger.info(`[Radar Cron] Sweep completed. Discovered ${newCount} brand-new job postings.`);
     } catch (err) {
-      console.error('[Radar Cron] Sweep failed:', err.message);
+      logger.error('[Radar Cron] Sweep failed:', err.message);
     }
   });
 }

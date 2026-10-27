@@ -1,8 +1,23 @@
 const crypto = require('crypto');
+const { logger } = require('../utils/logger');
 
 function requestIdMiddleware(req, res, next) {
+  const start = Date.now();
   req.id = req.headers['x-request-id'] || crypto.randomUUID();
   res.setHeader('X-Request-Id', req.id);
+
+  res.on('finish', () => {
+    const durationMs = Date.now() - start;
+    const route = req.originalUrl || req.url;
+    logger.info({
+      requestId: req.id,
+      route,
+      method: req.method,
+      statusCode: res.statusCode,
+      durationMs
+    }, `${req.method} ${route} ${res.statusCode} in ${durationMs}ms`);
+  });
+
   next();
 }
 
@@ -18,7 +33,16 @@ function errorHandler(err, req, res, next) {
     status = 403;
   }
 
-  // Log full stack server-side with request ID
+  // Structured logging with requestId, route, and full error details
+  logger.error({
+    requestId,
+    route: req.originalUrl || req.url,
+    method: req.method,
+    statusCode: status,
+    err: err.stack || err.message
+  }, `[Error] [RequestId: ${requestId}] ${status} ${req.method} ${req.originalUrl || req.url}: ${err.stack || err.message}`);
+
+  // Interceptable console.error for test assertion harnesses
   console.error(`[Error] [RequestId: ${requestId}] ${status} ${req.method} ${req.originalUrl || req.url}:`, err.stack || err);
 
   const isProduction = process.env.NODE_ENV === 'production';

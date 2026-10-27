@@ -1,3 +1,4 @@
+const { logger } = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
 const { db } = require('./database');
@@ -39,11 +40,11 @@ function runMigration() {
               }
             });
             tx(apps);
-            console.log(`[Migration] Migrated ${apps.length} applications from applications.json to SQLite.`);
+            logger.info(`[Migration] Migrated ${apps.length} applications from applications.json to SQLite.`);
           }
         }
       } catch (err) {
-        console.warn('[Migration] Error migrating applications.json:', err.message);
+        logger.warn('[Migration] Error migrating applications.json:', err.message);
       }
     }
 
@@ -73,10 +74,10 @@ function runMigration() {
             p.school || '',
             new Date().toISOString()
           );
-          console.log('[Migration] Migrated user profile from user_profile.json to SQLite.');
+          logger.info('[Migration] Migrated user profile from user_profile.json to SQLite.');
         }
       } catch (err) {
-        console.warn('[Migration] Error migrating user_profile.json:', err.message);
+        logger.warn('[Migration] Error migrating user_profile.json:', err.message);
       }
     }
 
@@ -108,15 +109,15 @@ function runMigration() {
               }
             });
             tx(providers);
-            console.log(`[Migration] Migrated ${providers.length} custom providers to SQLite.`);
+            logger.info(`[Migration] Migrated ${providers.length} custom providers to SQLite.`);
           }
         }
       } catch (err) {
-        console.warn('[Migration] Error migrating custom_providers.json:', err.message);
+        logger.warn('[Migration] Error migrating custom_providers.json:', err.message);
       }
     }
   } catch (err) {
-    console.error('[Migration] Failed during JSON to SQLite migration:', err.message);
+    logger.error('[Migration] Failed during JSON to SQLite migration:', err.message);
   }
 }
 
