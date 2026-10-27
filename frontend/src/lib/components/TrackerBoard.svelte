@@ -20,6 +20,16 @@
 		{ id: 'rejected', label: 'Rejected', color: 'border-red-500/30 text-red-400 bg-red-500/10' }
 	];
 
+	function getAppStage(app: any): ApplicationStage {
+		const raw = String(app.stage || app.status || 'saved').toLowerCase();
+		if (raw.includes('appli')) return 'applied';
+		if (raw.includes('screen')) return 'screening';
+		if (raw.includes('interv')) return 'interview';
+		if (raw.includes('offer')) return 'offer';
+		if (raw.includes('reject')) return 'rejected';
+		return 'saved';
+	}
+
 	async function moveStage(id: string, stage: ApplicationStage) {
 		try {
 			await updateApplicationStage(id, stage);
@@ -55,7 +65,7 @@
 	<!-- Kanban Columns Grid -->
 	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
 		{#each STAGES as col}
-			{@const colApps = applications.filter((a) => a.stage === col.id)}
+			{@const colApps = applications.filter((a) => getAppStage(a) === col.id)}
 			<div class="rounded-[8px] border border-border bg-surface-1/50 flex flex-col min-h-[380px]">
 				<!-- Column Header -->
 				<div class="p-3 border-b border-border flex items-center justify-between">
@@ -72,7 +82,7 @@
 					{#each colApps as app}
 						<div class="rounded-[6px] border border-border bg-surface-1 p-3 text-xs space-y-2 hover:border-border-strong transition-colors">
 							<div>
-								<h4 class="font-semibold text-text-1 truncate leading-tight">{app.role}</h4>
+								<h4 class="font-semibold text-text-1 truncate leading-tight">{app.role || (app as any).title || 'Software Engineer'}</h4>
 								<span class="text-[11px] font-medium text-text-2 truncate block mt-0.5">{app.company}</span>
 								{#if app.location}
 									<span class="text-[10px] text-text-3 truncate block">{app.location}</span>
@@ -82,7 +92,7 @@
 							<!-- Actions -->
 							<div class="flex items-center justify-between pt-1 border-t border-border/50 text-[11px]">
 								<select
-									value={app.stage}
+									value={getAppStage(app)}
 									onchange={(e) => moveStage(app.id, (e.target as HTMLSelectElement).value as ApplicationStage)}
 									class="h-6 rounded-[4px] border border-border bg-surface-2 px-1 text-[10px] text-text-2 focus:outline-none cursor-pointer"
 								>

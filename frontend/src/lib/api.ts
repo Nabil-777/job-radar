@@ -56,8 +56,23 @@ export async function fetchJobs(filters: JobFilterParams = {}): Promise<{ jobs: 
 	});
 	if (!res.ok) throw new Error('Failed to fetch jobs');
 	const data = await res.json();
-	const total = data.stats?.total ?? data.total ?? (data.jobs ? data.jobs.length : 0);
-	return { jobs: data.jobs || [], total };
+	const rawJobs: Job[] = data.jobs || [];
+	const seenIds = new Set<string>();
+	const jobs: Job[] = rawJobs.map((j, idx) => {
+		let uniqueId = j.id || `job-${idx}`;
+		if (seenIds.has(uniqueId)) {
+			uniqueId = `${uniqueId}-${idx}`;
+		}
+		seenIds.add(uniqueId);
+		return {
+			...j,
+			id: uniqueId,
+			contract: j.contract || (j as any).contract_type || '',
+			domain: j.domain || (j as any).category || ''
+		};
+	});
+	const total = data.stats?.total ?? data.total ?? jobs.length;
+	return { jobs, total };
 }
 
 export async function triggerRadarSweep(force = true): Promise<{ count: number }> {

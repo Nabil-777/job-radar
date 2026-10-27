@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import type { Job, Application, UserProfile, ActiveTab } from '#lib/types.js';
 	import {
 		fetchJobs,
@@ -88,6 +89,20 @@
 
 	const savedJobIds = $derived(
 		new Set(applications.map((a) => a.jobId).filter(Boolean))
+	);
+
+	const userSkills = $derived<string[]>(
+		Array.isArray(profile?.skills)
+			? profile.skills
+			: typeof profile?.skills === 'string'
+			? (profile.skills as string).split(',').map((s) => s.trim()).filter(Boolean)
+			: (profile as any)?.skillsArray || []
+	);
+
+	const structuredExperience = $derived<any[]>(
+		profile?.structuredCv?.experience ||
+		(profile?.structuredCv as any)?.workExperience ||
+		[]
 	);
 
 	// Data Loading Functions
@@ -189,7 +204,7 @@
 	}
 
 	// Initial data fetch
-	$effect(() => {
+	onMount(() => {
 		loadJobsData();
 		loadInitialUserData();
 	});
@@ -493,10 +508,10 @@
 				<!-- Extracted Skills Matrix -->
 				<div class="rounded-[8px] border border-border bg-surface-1 p-5 space-y-3">
 					<h3 class="text-xs font-semibold uppercase tracking-wider text-text-2">
-						Extracted Technical Skills ({profile?.skills?.length || 0})
+						Extracted Technical Skills ({userSkills.length})
 					</h3>
 					<div class="flex items-center gap-1.5 flex-wrap">
-						{#each (profile?.skills || []) as skill}
+						{#each userSkills as skill}
 							<span class="rounded-[4px] bg-surface-2 border border-border px-2.5 py-1 text-xs font-mono text-text-1">
 								{skill}
 							</span>
@@ -515,7 +530,7 @@
 							<h3 class="text-xs font-semibold uppercase tracking-wider text-text-2">
 								Verified Experience
 							</h3>
-							{#each (profile.structuredCv.experience || []) as exp}
+							{#each structuredExperience as exp}
 								<div class="border-b border-border/50 pb-2.5 space-y-1 text-xs">
 									<div class="flex items-center justify-between font-semibold text-text-1">
 										<span>{exp.title}</span>

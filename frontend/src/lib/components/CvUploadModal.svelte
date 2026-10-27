@@ -64,6 +64,13 @@
 			handleFile(target.files[0]);
 		}
 	}
+	const activeSkills = $derived<string[]>(
+		Array.isArray(profile?.skills)
+			? profile.skills
+			: typeof profile?.skills === 'string'
+			? (profile.skills as string).split(',').map((s) => s.trim()).filter(Boolean)
+			: (profile as any)?.skillsArray || []
+	);
 </script>
 
 {#if isOpen}
@@ -129,13 +136,13 @@
 			</div>
 		{/if}
 
-		{#if profile?.skills && profile.skills.length > 0}
+		{#if activeSkills.length > 0}
 			<div class="space-y-2 pt-2 border-t border-border">
 				<span class="text-[11px] font-mono text-text-3 block uppercase tracking-wider">
-					Currently Active Stack ({profile.skills.length})
+					Currently Active Stack ({activeSkills.length})
 				</span>
 				<div class="flex items-center gap-1.5 flex-wrap max-h-24 overflow-y-auto">
-					{#each profile.skills as s}
+					{#each activeSkills as s}
 						<span class="rounded-[4px] bg-surface-2 border border-border px-2 py-0.5 text-[11px] font-mono text-text-2">
 							{s}
 						</span>

@@ -17,7 +17,9 @@
 
 <QueryClientProvider client={queryClient}>
 	<div class="min-h-screen bg-surface-1 text-text-1 font-sans selection:bg-brand-500/20 selection:text-brand-500">
-		{@render children()}
+		{#if children}
+			{@render children()}
+		{/if}
 	</div>
 	<Toaster position="bottom-right" theme="dark" richColors />
 </QueryClientProvider>
