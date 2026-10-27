@@ -1,7 +1,11 @@
-# JobRadar v2.0 Production Container
-FROM node:20-bookworm-slim
+# syntax=docker/dockerfile:1
 
-# Install system dependencies needed for compiling better-sqlite3 native bindings
+# Stage 1: Build & Dependencies
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Install system compilation packages for native bindings (better-sqlite3)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -10,28 +14,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
-# Copy package descriptors first for Docker layer caching
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install only production dependencies
+RUN npm ci --omit=dev
 
-# Copy application source code
-COPY . .
+# Stage 2: Production Runtime (Lean, Non-Root)
+FROM node:20-slim AS runner
 
-# Ensure data directory exists for SQLite storage
-RUN mkdir -p /app/data
+WORKDIR /app
+
+# Install curl for HEALTHCHECK and ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create data directory for SQLite storage and set proper non-root permissions
+RUN mkdir -p /app/data && chown -R node:node /app
+
+# Copy production node_modules from builder
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node . .
+
+# Switch to standard non-root user
+USER node
 
 # Environment Defaults
-ENV NODE_ENV=production
-ENV PORT=4000
-ENV HOST=0.0.0.0
+ENV NODE_ENV=production \
+    PORT=4000 \
+    HOST=0.0.0.0
 
 EXPOSE 4000
 
-# Health check endpoint
+# Container Healthcheck
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD curl -f http://localhost:4000/api/health || exit 1
 

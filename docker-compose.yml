@@ -12,6 +12,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4000
+      - JWT_SECRET=${JWT_SECRET}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:4000}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -19,7 +21,7 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL:-}
-      - RADAR_CRON_SCHEDULE=${RADAR_CRON_SCHEDULE:-*/30 * * * *}
+      - RADAR_CRON_SCHEDULE=${RADAR_CRON_SCHEDULE:-0 */2 * * *}
     volumes:
       # Persistent SQLite storage volume
       - ./data:/app/data
