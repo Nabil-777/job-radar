@@ -30,7 +30,19 @@ app.use(helmet({
   contentSecurityPolicy: false, // Allows inline script evaluation for Tailwind CDN & Lucide
   crossOriginEmbedderPolicy: false
 }));
-app.use(cors());
+
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:4000').split(',').map(s => s.trim());
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']
+}));
 
 // Rate Limiting (500 requests per 15 minutes per IP)
 const limiter = rateLimit({
@@ -78,6 +90,9 @@ app.get('/api/export/applications', (req, res) => {
 
 // Centralized Error Handling Middleware
 app.use((err, req, res, next) => {
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ success: false, error: 'Not allowed by CORS' });
+  }
   console.error('[Unhandled Error]:', err);
   res.status(err.status || 500).json({
     success: false,
