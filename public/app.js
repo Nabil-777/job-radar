@@ -154,6 +154,105 @@ function renderAuthWidgets() {
     }
   }
 
+  renderHomeHero();
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderHomeHero() {
+  const container = document.getElementById('home-hero-container');
+  if (!container) return;
+
+  if (state.currentUser) {
+    const name = state.currentUser.fullName || state.currentUser.email.split('@')[0];
+    container.innerHTML = `
+      <div class="home-hero-card logged-in">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <div class="home-hero-badge">
+              <i data-lucide="shield-check" class="hero-badge-icon" style="color: var(--match-high-fg);"></i>
+              <span>Radar Synchronized</span>
+              <span class="hero-badge-dot"></span>
+              <span class="hero-badge-live">${state.currentUser.email}</span>
+            </div>
+            <h2 class="home-hero-title">
+              Welcome back, <span class="hero-gradient-text">${name}</span>.
+            </h2>
+            <p class="home-hero-subtitle">
+              Your personal radar is active. Live tech openings and internships across Morocco and global remote boards are continuously analyzed against your engineering DNA.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button onclick="switchView('tracker')" class="btn-hero-secondary">
+              <i data-lucide="kanban" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+              <span>My Tracker</span>
+            </button>
+            <button onclick="switchView('profile')" class="btn-hero-secondary">
+              <i data-lucide="file-text" style="width: 14px; height: 14px; color: var(--match-high-fg);"></i>
+              <span>CV & Match Profile</span>
+            </button>
+            <button onclick="triggerSearch(true)" class="btn-hero-demo" title="Force fresh scrape">
+              <i data-lucide="rotate-cw" style="width: 13px; height: 13px;"></i>
+              <span>Sync Radar</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      <div class="home-hero-card">
+        <div class="home-hero-badge">
+          <i data-lucide="radar" class="hero-badge-icon"></i>
+          <span>JobRadar v2.0 • Tech Talent Intelligence</span>
+          <span class="hero-badge-dot"></span>
+          <span class="hero-badge-live">19+ Sources Live</span>
+        </div>
+
+        <h1 class="home-hero-title">
+          When searching for jobs is no longer searching — <span class="hero-gradient-text">it's radar.</span>
+        </h1>
+
+        <p class="home-hero-subtitle">
+          Welcome to JobRadar. Finding your next tech role or stage PFE in Morocco and worldwide is finally effortless. Stop refreshing 20 different job boards every morning. We monitor the tech ecosystem in real-time, parsing your resume locally and matching openings directly to your stack.
+        </p>
+
+        <div class="home-hero-actions">
+          <button onclick="openAuthModal('signup')" class="btn-hero-primary">
+            <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+            <span>Create Free Account</span>
+          </button>
+          <button onclick="openAuthModal('login')" class="btn-hero-secondary">
+            <i data-lucide="log-in" style="width: 14px; height: 14px;"></i>
+            <span>Sign In</span>
+          </button>
+          <button onclick="handleDemoLogin()" class="btn-hero-demo" title="Instant explore without signing up">
+            <i data-lucide="zap" style="width: 13px; height: 13px; color: var(--match-med-fg);"></i>
+            <span>1-Click Demo Engineer</span>
+          </button>
+        </div>
+
+        <div class="home-hero-highlights">
+          <div class="hero-stat-chip">
+            <i data-lucide="cpu" style="width: 13px; height: 13px; color: var(--accent-primary);"></i>
+            <span>AI Match Scoring (0–100%)</span>
+          </div>
+          <div class="hero-stat-chip">
+            <i data-lucide="map-pin" style="width: 13px; height: 13px; color: var(--match-high-fg);"></i>
+            <span>Morocco ESNs & Global Remote</span>
+          </div>
+          <div class="hero-stat-chip">
+            <i data-lucide="send" style="width: 13px; height: 13px; color: var(--match-med-fg);"></i>
+            <span>4-in-1 Pitch Suite</span>
+          </div>
+          <div class="hero-stat-chip">
+            <i data-lucide="columns-3" style="width: 13px; height: 13px; color: var(--text-secondary);"></i>
+            <span>Integrated Kanban Tracker</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   if (window.lucide) lucide.createIcons();
 }
 
@@ -326,6 +425,105 @@ function switchView(viewName) {
   } else if (viewName === 'sources') {
     renderHealthTable();
     renderCustomProvidersList();
+  }
+
+  renderHomeHero();
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderHomeHero() {
+  const container = document.getElementById('home-hero-container');
+  if (!container) return;
+
+  if (state.currentUser) {
+    const name = state.currentUser.fullName || state.currentUser.email.split('@')[0];
+    container.innerHTML = `
+      <div class="home-hero-card logged-in">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+          <div>
+            <div class="home-hero-badge">
+              <i data-lucide="shield-check" class="hero-badge-icon" style="color: var(--match-high-fg);"></i>
+              <span>Radar Synchronized</span>
+              <span class="hero-badge-dot"></span>
+              <span class="hero-badge-live">${state.currentUser.email}</span>
+            </div>
+            <h2 class="home-hero-title">
+              Welcome back, <span class="hero-gradient-text">${name}</span>.
+            </h2>
+            <p class="home-hero-subtitle">
+              Your personal radar is active. Live tech openings and internships across Morocco and global remote boards are continuously analyzed against your engineering DNA.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button onclick="switchView('tracker')" class="btn-hero-secondary">
+              <i data-lucide="kanban" style="width: 14px; height: 14px; color: var(--accent-primary);"></i>
+              <span>My Tracker</span>
+            </button>
+            <button onclick="switchView('profile')" class="btn-hero-secondary">
+              <i data-lucide="file-text" style="width: 14px; height: 14px; color: var(--match-high-fg);"></i>
+              <span>CV & Match Profile</span>
+            </button>
+            <button onclick="triggerSearch(true)" class="btn-hero-demo" title="Force fresh scrape">
+              <i data-lucide="rotate-cw" style="width: 13px; height: 13px;"></i>
+              <span>Sync Radar</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      <div class="home-hero-card">
+        <div class="home-hero-badge">
+          <i data-lucide="radar" class="hero-badge-icon"></i>
+          <span>JobRadar v2.0 • Tech Talent Intelligence</span>
+          <span class="hero-badge-dot"></span>
+          <span class="hero-badge-live">19+ Sources Live</span>
+        </div>
+
+        <h1 class="home-hero-title">
+          When searching for jobs is no longer searching — <span class="hero-gradient-text">it's radar.</span>
+        </h1>
+
+        <p class="home-hero-subtitle">
+          Welcome to JobRadar. Finding your next tech role or stage PFE in Morocco and worldwide is finally effortless. Stop refreshing 20 different job boards every morning. We monitor the tech ecosystem in real-time, parsing your resume locally and matching openings directly to your stack.
+        </p>
+
+        <div class="home-hero-actions">
+          <button onclick="openAuthModal('signup')" class="btn-hero-primary">
+            <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+            <span>Create Free Account</span>
+          </button>
+          <button onclick="openAuthModal('login')" class="btn-hero-secondary">
+            <i data-lucide="log-in" style="width: 14px; height: 14px;"></i>
+            <span>Sign In</span>
+          </button>
+          <button onclick="handleDemoLogin()" class="btn-hero-demo" title="Instant explore without signing up">
+            <i data-lucide="zap" style="width: 13px; height: 13px; color: var(--match-med-fg);"></i>
+            <span>1-Click Demo Engineer</span>
+          </button>
+        </div>
+
+        <div class="home-hero-highlights">
+          <div class="hero-stat-chip">
+            <i data-lucide="cpu" style="width: 13px; height: 13px; color: var(--accent-primary);"></i>
+            <span>AI Match Scoring (0–100%)</span>
+          </div>
+          <div class="hero-stat-chip">
+            <i data-lucide="map-pin" style="width: 13px; height: 13px; color: var(--match-high-fg);"></i>
+            <span>Morocco ESNs & Global Remote</span>
+          </div>
+          <div class="hero-stat-chip">
+            <i data-lucide="send" style="width: 13px; height: 13px; color: var(--match-med-fg);"></i>
+            <span>4-in-1 Pitch Suite</span>
+          </div>
+          <div class="hero-stat-chip">
+            <i data-lucide="columns-3" style="width: 13px; height: 13px; color: var(--text-secondary);"></i>
+            <span>Integrated Kanban Tracker</span>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   if (window.lucide) lucide.createIcons();
