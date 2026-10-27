@@ -1,311 +1,587 @@
-// JobRadar v2.0 Frontend Controller
-let state = {
-  currentDomain: 'all',
-  currentTab: 'jobs',
+/**
+ * JobRadar v2.0 — Craft Frontend Controller (Linear / Raycast / Read.cv Inspired)
+ * High-Density Scannability, Keyboard Navigation (j/k/⌘K), 3-Zone Shell, Inspector Drawer
+ */
+
+// Application State
+const state = {
+  currentView: 'jobs',           // 'jobs' | 'morocco' | 'tracker' | 'profile' | 'sources'
+  feedViewMode: 'list',          // 'list' | 'grid'
   jobs: [],
+  filteredJobs: [],
   applications: [],
   profile: null,
-  activeModalJob: null,
-  activeTrackerFilter: 'all',
-  trackerMode: 'kanban', // 'kanban' | 'list'
-  hiddenCompanies: new Set(),
   health: null,
-  activePitchTab: 'letter', // 'letter' | 'linkedin' | 'cold' | 'tips'
-  currentPitchData: null
+  customProviders: [],
+  selectedIndex: -1,             // Keyboard focused job index
+  activeDrawerJob: null,         // Currently inspected job in right slide-over
+  activePitchMode: 'letter',     // 'letter' | 'linkedin' | 'cold' | 'tips'
+  pitchDataCache: {},            // Cache generated pitches by jobId
+  theme: localStorage.getItem('jobradar_theme') || 'dark'
 };
 
+// ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async () => {
+  // Apply theme
+  document.documentElement.setAttribute('data-theme', state.theme);
+  updateThemeButton();
+
+  // Load saved view mode
+  const savedViewMode = localStorage.getItem('jobradar_view_mode') || 'list';
+  setFeedViewMode(savedViewMode, false);
+
+  // Setup drag & drop for CV
+  setupCvDropzone();
+
+  // Register global keyboard listeners
+  setupKeyboardNavigation();
+
+  // Initialize Lucide icons
   if (window.lucide) lucide.createIcons();
-  await loadUserProfile();
-  await loadApplications();
-  await loadProviderHealth();
-  triggerSearch();
+
+  // Concurrent initial fetches
+  await Promise.allSettled([
+    loadUserProfile(),
+    loadApplications(),
+    loadProviderHealth(),
+    loadCustomProviders()
+  ]);
+
+  // Initial jobs search
+  await triggerSearch();
 });
 
-// Tab Switcher
-function switchTab(tabName) {
-  state.currentTab = tabName;
+// ==================== THEME CONTROLLER ====================
+function toggleTheme() {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', state.theme);
+  localStorage.setItem('jobradar_theme', state.theme);
+  updateThemeButton();
+  if (window.lucide) lucide.createIcons();
+}
 
-  document.querySelectorAll('.nav-tab').forEach(btn => {
-    btn.classList.remove('active', 'bg-brand-600', 'text-white');
-    btn.classList.add('text-slate-400');
-  });
-
-  const activeBtn = document.getElementById(`tab-${tabName}`);
-  if (activeBtn) {
-    activeBtn.classList.add('active', 'bg-brand-600', 'text-white');
-    activeBtn.classList.remove('text-slate-400');
+function updateThemeButton() {
+  const label = document.getElementById('theme-toggle-label');
+  if (label) {
+    label.textContent = state.theme === 'dark' ? 'Light Mode' : 'Dark Mode';
   }
+}
 
-  ['jobs', 'morocco', 'tracker', 'profile', 'tips'].forEach(name => {
-    const el = document.getElementById(`view-${name}`);
-    if (el) el.classList.add('hidden');
+// ==================== NAVIGATION VIEWS ====================
+function switchView(viewName) {
+  state.currentView = viewName;
+
+  // Update left rail items
+  ['jobs', 'morocco', 'tracker', 'profile', 'sources'].forEach(v => {
+    const btn = document.getElementById(`nav-btn-${v}`);
+    const section = document.getElementById(`view-${v}`);
+    if (btn) btn.classList.toggle('active', v === viewName);
+    if (section) section.style.display = v === viewName ? (v === 'jobs' ? 'block' : 'flex') : 'none';
   });
 
-  const targetView = document.getElementById(`view-${tabName}`);
-  if (targetView) targetView.classList.remove('hidden');
-
-  if (tabName === 'tracker') {
-    renderTracker();
+  if (viewName === 'tracker') {
+    renderKanbanBoard();
+  } else if (viewName === 'sources') {
+    renderHealthTable();
+    renderCustomProvidersList();
   }
 
   if (window.lucide) lucide.createIcons();
 }
 
-// Domain Selector Pills
-function setDomain(domain) {
-  state.currentDomain = domain;
-  document.querySelectorAll('.domain-pill').forEach(pill => {
-    if (pill.dataset.domain === domain) {
-      pill.className = 'domain-pill px-3 py-1.5 rounded-lg text-xs font-medium border border-brand-500/40 bg-brand-600/20 text-brand-300 hover:bg-brand-600 hover:text-white transition-all whitespace-nowrap active';
-    } else {
-      pill.className = 'domain-pill px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-700 bg-surface-800 text-slate-300 hover:border-brand-500/50 hover:text-white transition-all whitespace-nowrap';
+// ==================== KEYBOARD FIRST NAVIGATION ====================
+function setupKeyboardNavigation() {
+  window.addEventListener('keydown', (e) => {
+    // If inside text input / textarea, only check Escape or Cmd+K
+    const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
+
+    // ⌘K or Ctrl+K: Focus Search Input
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      const searchInput = document.getElementById('cmd-search-input');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
+      return;
+    }
+
+    // Escape: Close drawer or modals
+    if (e.key === 'Escape') {
+      closeDrawer();
+      closeShortcutsModal();
+      closeAddFeedModal();
+      return;
+    }
+
+    if (isInput) return;
+
+    // ? : Open shortcuts cheat sheet
+    if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+      e.preventDefault();
+      openShortcutsModal();
+      return;
+    }
+
+    // j or ArrowDown: Next job in feed
+    if (e.key === 'j' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveFocus(1);
+    }
+
+    // k or ArrowUp: Previous job in feed
+    if (e.key === 'k' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveFocus(-1);
+    }
+
+    // Enter: Inspect currently focused job
+    if (e.key === 'Enter') {
+      if (state.selectedIndex >= 0 && state.jobs[state.selectedIndex]) {
+        e.preventDefault();
+        openDrawer(state.jobs[state.selectedIndex]);
+      }
+    }
+
+    // s: Bookmark / Save currently focused job
+    if (e.key === 's') {
+      if (state.selectedIndex >= 0 && state.jobs[state.selectedIndex]) {
+        e.preventDefault();
+        toggleTrackJob(state.jobs[state.selectedIndex]);
+      }
+    }
+
+    // c: Open AI Pitch directly in drawer for focused job
+    if (e.key === 'c') {
+      if (state.selectedIndex >= 0 && state.jobs[state.selectedIndex]) {
+        e.preventDefault();
+        openDrawer(state.jobs[state.selectedIndex]);
+        switchDrawerTab('pitch');
+      }
     }
   });
-  triggerSearch();
 }
 
-function handleSearch(e) {
-  if (e) e.preventDefault();
-  triggerSearch();
+function moveFocus(delta) {
+  if (state.jobs.length === 0) return;
+  state.selectedIndex = Math.max(0, Math.min(state.jobs.length - 1, state.selectedIndex + delta));
+
+  document.querySelectorAll('.job-card').forEach((card, idx) => {
+    card.classList.toggle('keyboard-focused', idx === state.selectedIndex);
+  });
+
+  const focusedCard = document.querySelectorAll('.job-card')[state.selectedIndex];
+  if (focusedCard) {
+    focusedCard.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
 }
 
-// Relative time helper
-function formatRelativeTime(dateString) {
-  if (!dateString) return 'Recently';
-  if (!dateString.includes('T') && !dateString.includes('-')) return dateString;
-  const diffMs = Date.now() - new Date(dateString).getTime();
-  if (isNaN(diffMs)) return dateString;
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  if (diffHours < 1) return 'Just now';
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 30) return `${diffDays}d ago`;
-  const diffMonths = Math.floor(diffDays / 30);
-  return `${diffMonths}mo ago`;
+function handleSearchKey(e) {
+  if (e.key === 'Enter') {
+    triggerSearch();
+  }
 }
 
-// Trigger Search Request
+// ==================== SEARCH & FEED ENGINE ====================
 async function triggerSearch(forceRefresh = false) {
-  const keywords = document.getElementById('input-keywords').value;
-  const experienceLevel = document.getElementById('select-level').value;
-  const location = document.getElementById('select-location').value;
-  const source = document.getElementById('select-source').value;
-  const workType = document.getElementById('select-worktype').value;
+  const keywords = document.getElementById('cmd-search-input').value.trim();
+  const location = document.getElementById('filter-location').value;
+  const experienceLevel = document.getElementById('filter-level').value;
+  const source = document.getElementById('filter-source').value;
 
-  const cardsContainer = document.getElementById('job-cards-container');
+  const container = document.getElementById('job-feed-container');
   const skeletons = document.getElementById('loading-skeletons');
   const emptyState = document.getElementById('empty-state');
-  const badgeLoading = document.getElementById('badge-loading');
+  const syncBtn = document.getElementById('btn-sync');
 
-  cardsContainer.innerHTML = '';
-  skeletons.classList.remove('hidden');
-  emptyState.classList.add('hidden');
-  badgeLoading.classList.remove('hidden');
+  if (skeletons) skeletons.style.display = 'flex';
+  if (emptyState) emptyState.style.display = 'none';
+  if (container) container.innerHTML = '';
+  if (syncBtn) syncBtn.classList.add('spinning');
 
   try {
     const params = new URLSearchParams({
-      domain: state.currentDomain,
       keywords,
-      experienceLevel,
       location,
+      experienceLevel,
       source,
-      workType,
-      limit: '50',
-      refresh: forceRefresh ? 'true' : 'false'
+      limit: '60'
     });
+    if (forceRefresh) params.append('refresh', 'true');
 
     const res = await fetch(`/api/jobs?${params.toString()}`);
     const data = await res.json();
 
-    skeletons.classList.add('hidden');
-    badgeLoading.classList.add('hidden');
-
-    if (data.success && data.jobs && data.jobs.length > 0) {
+    if (data.success && data.jobs) {
       state.jobs = data.jobs;
-      updateStats(data.stats, data.jobs);
-      renderJobCards(data.jobs);
-    } else {
-      state.jobs = [];
-      emptyState.classList.remove('hidden');
-      updateStats({ total: 0, byLevel: { internship: 0, entry: 0 } }, []);
+      state.selectedIndex = -1;
+      renderJobFeed(state.jobs);
+      updateFeedStats(state.jobs);
     }
   } catch (err) {
-    console.error('Search error:', err);
-    skeletons.classList.add('hidden');
-    badgeLoading.classList.add('hidden');
-    emptyState.classList.remove('hidden');
+    console.error('Search request failed:', err);
+    showToast('Failed to fetch opportunities', 'alert-circle');
+  } finally {
+    if (skeletons) skeletons.style.display = 'none';
+    if (syncBtn) syncBtn.classList.remove('spinning');
   }
 }
 
-// Update Top Statistics
-function updateStats(stats = {}, jobs = []) {
-  document.getElementById('stat-total').textContent = stats.total || jobs.length || 0;
-  document.getElementById('stat-intern').textContent = stats.byLevel?.internship || jobs.filter(j => (j.experienceLevel || '').toLowerCase().includes('intern')).length || 0;
-  document.getElementById('stat-entry').textContent = stats.byLevel?.entry || jobs.filter(j => (j.experienceLevel || '').toLowerCase().includes('entry') || (j.experienceLevel || '').toLowerCase().includes('junior')).length || 0;
+function setFeedViewMode(mode, save = true) {
+  state.feedViewMode = mode;
+  if (save) localStorage.setItem('jobradar_view_mode', mode);
+
+  const container = document.getElementById('job-feed-container');
+  if (container) {
+    container.classList.toggle('grid-view', mode === 'grid');
+  }
+
+  const btnList = document.getElementById('btn-view-list');
+  const btnGrid = document.getElementById('btn-view-grid');
+  if (btnList) btnList.classList.toggle('active', mode === 'list');
+  if (btnGrid) btnGrid.classList.toggle('active', mode === 'grid');
 }
 
-// Render Job Cards with Match Score, Skills & Actions
-function renderJobCards(jobs) {
-  const container = document.getElementById('job-cards-container');
-  container.innerHTML = '';
+function updateFeedStats(jobs) {
+  const countPill = document.getElementById('rail-feed-count');
+  if (countPill) countPill.textContent = jobs.length;
 
-  const trackedUrls = new Set(state.applications.map(a => a.url));
-  const filteredJobs = jobs.filter(j => !state.hiddenCompanies.has((j.company || '').toLowerCase()));
+  const statTotal = document.getElementById('stat-total');
+  const statIntern = document.getElementById('stat-intern');
+  const statEntry = document.getElementById('stat-entry');
 
-  if (filteredJobs.length === 0) {
-    document.getElementById('empty-state').classList.remove('hidden');
+  if (statTotal) statTotal.textContent = jobs.length;
+
+  let internCount = 0;
+  let entryCount = 0;
+
+  jobs.forEach(j => {
+    const lvl = (j.experienceLevel || '').toLowerCase();
+    if (lvl.includes('intern') || lvl.includes('stage') || lvl.includes('pfe')) internCount++;
+    else if (lvl.includes('entry') || lvl.includes('junior')) entryCount++;
+  });
+
+  if (statIntern) statIntern.textContent = internCount;
+  if (statEntry) statEntry.textContent = entryCount;
+}
+
+// Company Monogram & Favicon Helper
+function getCompanyAvatarHtml(company, url) {
+  const cleanComp = (company || 'Company').trim();
+  const monogram = cleanComp.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'CO';
+
+  let domain = '';
+  try {
+    if (url && url.startsWith('http')) {
+      domain = new URL(url).hostname;
+    }
+  } catch (e) {}
+
+  if (domain && !domain.includes('linkedin') && !domain.includes('rekrute')) {
+    const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    return `
+      <div class="company-avatar">
+        <img src="${faviconUrl}" alt="${cleanComp}" onerror="this.parentElement.innerHTML='${monogram}'">
+      </div>
+    `;
+  }
+
+  return `<div class="company-avatar">${monogram}</div>`;
+}
+
+function formatRelativeTime(dateString) {
+  if (!dateString) return 'Recent';
+  const diffMs = Date.now() - new Date(dateString).getTime();
+  if (isNaN(diffMs)) return 'Recent';
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  if (diffHours < 1) return 'Just now';
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return '1d ago';
+  if (diffDays < 30) return `${diffDays}d ago`;
+  return `${Math.floor(diffDays / 30)}mo ago`;
+}
+
+// Render Job Cards Feed
+function renderJobFeed(jobs) {
+  const container = document.getElementById('job-feed-container');
+  const emptyState = document.getElementById('empty-state');
+  if (!container) return;
+
+  if (jobs.length === 0) {
+    container.innerHTML = '';
+    if (emptyState) emptyState.style.display = 'block';
     return;
   }
 
-  filteredJobs.forEach(job => {
-    const isTracked = trackedUrls.has(job.url);
+  if (emptyState) emptyState.style.display = 'none';
 
-    // Experience badge
-    let levelBadge = 'badge-entry';
-    let levelIcon = '🚀';
-    const lowerLevel = (job.experienceLevel || '').toLowerCase();
-    if (lowerLevel.includes('intern')) {
-      levelBadge = 'badge-intern';
-      levelIcon = '🎓';
-    } else if (lowerLevel.includes('senior')) {
-      levelBadge = 'badge-senior';
-      levelIcon = '🏆';
-    }
+  container.innerHTML = jobs.map((job, idx) => {
+    const isSaved = state.applications.some(a => a.url === job.url);
+    const score = job.matchScore !== undefined ? job.matchScore : 50;
+    const scoreClass = score >= 80 ? 'high' : (score >= 55 ? 'med' : 'low');
 
-    // Match Score styling
-    const score = job.matchScore || 70;
-    let matchClass = 'match-high';
-    if (score < 60) matchClass = 'bg-surface-800 text-slate-400 border border-slate-700';
-    else if (score < 80) matchClass = 'match-med';
+    // Matched skills highlight
+    const matchedSet = new Set((job.matchedSkills || []).map(s => s.toLowerCase()));
+    const tags = Array.isArray(job.tags) ? job.tags.slice(0, 5) : [];
 
-    // Source Badge class
-    let cleanSourceKey = (job.source || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (cleanSourceKey.includes('hackernews')) cleanSourceKey = 'hackernews';
-    if (cleanSourceKey.includes('jobzyn')) cleanSourceKey = 'jobzyn';
-    if (cleanSourceKey.includes('wetech')) cleanSourceKey = 'wetech';
-    if (cleanSourceKey.includes('moroccotopesn')) cleanSourceKey = 'moroccotopesnhub';
-    if (cleanSourceKey.includes('talent')) cleanSourceKey = 'talentcommaroc';
-    if (cleanSourceKey.includes('dreamjob')) cleanSourceKey = 'dreamjobma';
-    if (cleanSourceKey.includes('emploi')) cleanSourceKey = 'emploima';
-    if (cleanSourceKey.includes('custom') || cleanSourceKey.includes('rss') || cleanSourceKey.includes('feed')) cleanSourceKey = 'custom';
-    const sourceClass = `badge-source-${cleanSourceKey}`;
+    const isCurrentInspect = state.activeDrawerJob && state.activeDrawerJob.id === job.id;
 
-    // Contract type
-    const contract = job.contractType || (lowerLevel.includes('intern') ? 'Stage / PFE' : 'CDI');
+    return `
+      <div class="job-card ${isCurrentInspect ? 'is-active-inspect' : ''}" onclick="openDrawerByIndex(${idx})">
+        <!-- 1. Left Avatar -->
+        ${getCompanyAvatarHtml(job.company, job.url)}
 
-    // Matched skills pills
-    const matchedPills = (job.matchedSkills || []).slice(0, 3).map(s =>
-      `<span class="px-1.5 py-0.2 rounded text-[10px] bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 font-medium">+ ${s}</span>`
-    ).join(' ');
-
-    const missingPills = (job.missingSkills || []).slice(0, 2).map(s =>
-      `<span class="px-1.5 py-0.2 rounded text-[10px] bg-slate-800 text-slate-500 border border-slate-700/60 font-mono">- ${s}</span>`
-    ).join(' ');
-
-    const card = document.createElement('div');
-    card.className = 'job-card bg-surface-900 border border-slate-800 rounded-xl p-5 flex flex-col justify-between shadow-md space-y-4 relative group';
-
-    card.innerHTML = `
-      <div class="space-y-3">
-        <!-- Top row: Company, Location, Match Score & Source -->
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-lg bg-surface-800 border border-slate-700 flex items-center justify-center font-bold text-slate-300 text-sm overflow-hidden flex-shrink-0">
-              ${job.logo ? `<img src="${job.logo}" alt="${job.company}" class="w-full h-full object-contain" onerror="this.parentElement.textContent='${job.company[0]}'">` : job.company[0] || 'C'}
-            </div>
-            <div>
-              <div class="flex items-center space-x-1.5">
-                <h4 class="text-xs font-bold text-slate-300 line-clamp-1">${job.company}</h4>
-                <button onclick="hideCompany('${job.company.replace(/'/g, "\\'")}')" class="text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity text-[10px]" title="Hide this company">
-                  <i data-lucide="eye-off" class="w-3 h-3"></i>
-                </button>
-              </div>
-              <div class="flex items-center space-x-2 text-[11px] text-slate-500 mt-0.5">
-                <span class="flex items-center space-x-1">
-                  <i data-lucide="map-pin" class="w-3 h-3 text-slate-500"></i>
-                  <span class="line-clamp-1">${job.location}</span>
-                </span>
-                ${job.remote ? `<span class="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 text-[10px] border border-emerald-500/20">Remote</span>` : ''}
-              </div>
-            </div>
+        <!-- 2. Middle Role Metadata -->
+        <div class="card-main-meta">
+          <div class="card-title-row">
+            <h4 class="card-title" title="${job.title}">${job.title}</h4>
+            ${job.isNew ? '<span class="badge-new-dot" title="New unseen opportunity"></span>' : ''}
           </div>
-          <div class="flex flex-col items-end space-y-1">
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${matchClass}">
-              🔥 ${score}% Match
-            </span>
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-medium ${sourceClass}">
-              ${job.source}
-            </span>
+
+          <div class="card-subtitle-row">
+            <span>${job.company}</span>
+            <span class="bullet-sep">•</span>
+            <span>${job.location || 'Remote'}</span>
+            ${job.remote ? '<span class="bullet-sep">•</span><span class="contract-pill">Remote</span>' : ''}
+            <span class="bullet-sep">•</span>
+            <span class="contract-pill">${job.experienceLevel || 'Stage / PFE'}</span>
+          </div>
+
+          <div class="card-skills-row">
+            ${tags.map(t => `<span class="tech-pill ${matchedSet.has(t.toLowerCase()) ? 'matched' : ''}">${t}</span>`).join('')}
           </div>
         </div>
 
-        <!-- Job Title & Contract Type -->
-        <div>
-          <div class="flex items-center space-x-2 mb-1">
-            <span class="px-2 py-0.2 rounded text-[10px] font-semibold bg-brand-500/10 text-brand-300 border border-brand-500/20">
-              ${contract}
-            </span>
-            <span class="px-2 py-0.2 rounded-full text-[10px] font-semibold ${levelBadge}">
-              ${levelIcon} ${job.experienceLevel}
-            </span>
+        <!-- 3. Right Score & Meta -->
+        <div class="card-right-meta">
+          <span class="match-score-pill ${scoreClass}">${score}% MATCH</span>
+          <div class="card-time-sources">
+            <span>${formatRelativeTime(job.publishedAt || job.fetchedAt)}</span>
+            <span class="source-badge">${job.source}</span>
           </div>
-          <h3 class="text-base font-bold text-white hover:text-brand-300 transition-colors line-clamp-2">
-            <a href="${job.url}" target="_blank" rel="noopener noreferrer">${job.title}</a>
-          </h3>
-          ${job.salary ? `<p class="text-xs text-amber-400/90 font-medium mt-1">💰 ${job.salary}</p>` : ''}
-          ${job.descriptionSnippet ? `<p class="text-xs text-slate-400 mt-2 line-clamp-2 leading-relaxed">${job.descriptionSnippet}</p>` : ''}
-        </div>
-
-        <!-- Matched Skills Pills -->
-        <div class="flex flex-wrap items-center gap-1.5 pt-1">
-          ${matchedPills}
-          ${missingPills}
-        </div>
-      </div>
-
-      <!-- Actions Footer -->
-      <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-        <span class="text-[11px] text-slate-500 flex items-center space-x-1">
-          <i data-lucide="clock" class="w-3 h-3"></i>
-          <span>${formatRelativeTime(job.datePosted)}</span>
-        </span>
-
-        <div class="flex items-center space-x-2">
-          <!-- AI Pitch & Letter Button -->
-          <button onclick='openAIPitchModal(${JSON.stringify(job).replace(/'/g, "&apos;")})' class="px-2.5 py-1.5 rounded-lg bg-surface-800 hover:bg-slate-700 text-brand-300 text-xs font-semibold border border-brand-500/30 flex items-center space-x-1 transition-all" title="Generate Tailored AI Cover Letter, LinkedIn note & CV tips">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-400"></i>
-            <span>AI Pitch</span>
-          </button>
-
-          <!-- Track Button -->
-          <button id="btn-track-${job.id}" onclick='toggleTrackJob(${JSON.stringify(job).replace(/'/g, "&apos;")})' class="px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center space-x-1 ${isTracked ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30' : 'bg-surface-800 hover:bg-slate-700 text-slate-300 border-slate-700'}">
-            <i data-lucide="${isTracked ? 'check' : 'bookmark'}" class="w-3.5 h-3.5"></i>
-            <span>${isTracked ? 'Saved' : 'Track'}</span>
-          </button>
-
-          <!-- Direct Apply Button -->
-          <a href="${job.url}" target="_blank" rel="noopener noreferrer" onclick='autoTrackApplied(${JSON.stringify(job).replace(/'/g, "&apos;")})' class="px-3 py-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 text-white text-xs font-semibold flex items-center space-x-1 shadow-md shadow-brand-500/20 transition-all">
-            <span>Apply</span>
-            <i data-lucide="external-link" class="w-3 h-3"></i>
-          </a>
+          <div class="card-hover-actions" onclick="event.stopPropagation()">
+            <button onclick="toggleTrackJobByIndex(${idx})" class="btn-action-icon" title="${isSaved ? 'Tracked in Pipeline' : 'Save to Pipeline'}">
+              <i data-lucide="${isSaved ? 'check' : 'bookmark'}" style="width: 13px; height: 13px; color: ${isSaved ? 'var(--match-high-fg)' : 'currentColor'};"></i>
+            </button>
+            <button onclick="quickOpenPitch(${idx})" class="btn-action-icon" title="Generate AI Pitch">
+              <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i>
+            </button>
+            <a href="${job.url}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Open Original Posting">
+              <i data-lucide="external-link" style="width: 13px; height: 13px;"></i>
+            </a>
+          </div>
         </div>
       </div>
     `;
-
-    container.appendChild(card);
-  });
+  }).join('');
 
   if (window.lucide) lucide.createIcons();
 }
 
-function hideCompany(company) {
-  state.hiddenCompanies.add(company.toLowerCase());
-  renderJobCards(state.jobs);
+// Preset Quick Filters (Left Rail)
+function applyPresetFilter(presetKey) {
+  switchView('jobs');
+  const kwInput = document.getElementById('cmd-search-input');
+  const locSelect = document.getElementById('filter-location');
+  const lvlSelect = document.getElementById('filter-level');
+
+  if (presetKey === 'pfe') {
+    kwInput.value = 'PFE';
+    locSelect.value = 'Morocco';
+    lvlSelect.value = 'internship';
+  } else if (presetKey === 'fullstack') {
+    kwInput.value = 'Full Stack React Node';
+    locSelect.value = 'Worldwide';
+    lvlSelect.value = 'entry';
+  } else if (presetKey === 'cyber') {
+    kwInput.value = 'Cybersecurity SOC';
+    locSelect.value = 'Worldwide';
+    lvlSelect.value = 'all';
+  } else if (presetKey === 'ai') {
+    kwInput.value = 'Machine Learning AI Python';
+    locSelect.value = 'Worldwide';
+    lvlSelect.value = 'all';
+  } else if (presetKey === 'relocate') {
+    kwInput.value = '';
+    locSelect.value = 'Europe';
+    lvlSelect.value = 'all';
+  }
+
+  triggerSearch();
 }
 
-// ==================== KANBAN APPLICATION TRACKER ====================
+function resetFiltersAndSearch() {
+  document.getElementById('cmd-search-input').value = '';
+  document.getElementById('filter-location').value = 'Worldwide';
+  document.getElementById('filter-level').value = 'all';
+  document.getElementById('filter-source').value = 'all';
+  triggerSearch();
+}
+
+// ==================== RIGHT SLIDE-OVER INSPECTOR DRAWER ====================
+function openDrawerByIndex(idx) {
+  state.selectedIndex = idx;
+  const job = state.jobs[idx];
+  if (job) openDrawer(job);
+}
+
+function openDrawer(job) {
+  state.activeDrawerJob = job;
+
+  const drawer = document.getElementById('inspector-drawer');
+  const backdrop = document.getElementById('drawer-backdrop');
+  if (drawer) drawer.classList.add('open');
+  if (backdrop) backdrop.classList.add('open');
+
+  // Highlight selected card
+  document.querySelectorAll('.job-card').forEach((card, idx) => {
+    card.classList.toggle('is-active-inspect', state.jobs[idx] && state.jobs[idx].id === job.id);
+  });
+
+  // Populate Header
+  document.getElementById('drawer-job-title').textContent = job.title;
+  document.getElementById('drawer-job-company-loc').textContent = `${job.company} • ${job.location || 'Remote'}`;
+  document.getElementById('drawer-company-avatar').innerHTML = getCompanyAvatarHtml(job.company, job.url);
+
+  // Apply button
+  const applyLink = document.getElementById('drawer-apply-link');
+  applyLink.href = job.url;
+  applyLink.innerHTML = `<span>Apply on ${job.source}</span><i data-lucide="external-link" style="width: 13px; height: 13px;"></i>`;
+
+  // Status dropdown
+  const statusSelect = document.getElementById('drawer-status-select');
+  const tracked = state.applications.find(a => a.url === job.url);
+  statusSelect.value = tracked ? tracked.status : 'none';
+
+  // Overview Tab details
+  const score = job.matchScore !== undefined ? job.matchScore : 50;
+  const gaugeEl = document.getElementById('drawer-match-gauge');
+  gaugeEl.textContent = `${score}% Match Fit`;
+  gaugeEl.style.color = score >= 80 ? 'var(--match-high-fg)' : (score >= 55 ? 'var(--match-med-fg)' : 'var(--text-muted)');
+
+  const matchedBox = document.getElementById('drawer-matched-skills');
+  const missingBox = document.getElementById('drawer-missing-skills');
+
+  matchedBox.innerHTML = (job.matchedSkills && job.matchedSkills.length > 0)
+    ? job.matchedSkills.map(s => `<span class="tech-pill matched">${s}</span>`).join('')
+    : '<span style="font-size: 11px; color: var(--text-muted);">None detected from profile</span>';
+
+  missingBox.innerHTML = (job.missingSkills && job.missingSkills.length > 0)
+    ? job.missingSkills.map(s => `<span class="tech-pill">${s}</span>`).join('')
+    : '<span style="font-size: 11px; color: var(--text-muted);">Profile covers all extracted core tags</span>';
+
+  // Job description
+  const descEl = document.getElementById('drawer-job-desc');
+  descEl.textContent = job.description || 'Full description available directly on source portal. Click "Apply on Source" to view the complete posting.';
+
+  // Default to overview tab
+  switchDrawerTab('overview');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeDrawer() {
+  const drawer = document.getElementById('inspector-drawer');
+  const backdrop = document.getElementById('drawer-backdrop');
+  if (drawer) drawer.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('open');
+  state.activeDrawerJob = null;
+  document.querySelectorAll('.job-card').forEach(card => card.classList.remove('is-active-inspect'));
+}
+
+function switchDrawerTab(tab) {
+  const tabOverview = document.getElementById('drawer-tab-overview');
+  const tabPitch = document.getElementById('drawer-tab-pitch');
+  const contentOverview = document.getElementById('drawer-content-overview');
+  const contentPitch = document.getElementById('drawer-content-pitch');
+
+  tabOverview.classList.toggle('active', tab === 'overview');
+  tabPitch.classList.toggle('active', tab === 'pitch');
+
+  contentOverview.style.display = tab === 'overview' ? 'flex' : 'none';
+  contentPitch.style.display = tab === 'pitch' ? 'flex' : 'none';
+
+  if (tab === 'pitch') {
+    generatePitchForDrawer();
+  }
+}
+
+function quickOpenPitch(idx) {
+  openDrawerByIndex(idx);
+  switchDrawerTab('pitch');
+}
+
+// ==================== AI CO-PILOT STUDIO IN DRAWER ====================
+function setPitchMode(mode) {
+  state.activePitchMode = mode;
+  ['letter', 'linkedin', 'cold', 'tips'].forEach(m => {
+    const btn = document.getElementById(`ai-tab-${m}`);
+    if (btn) btn.classList.toggle('active', m === mode);
+  });
+  renderCurrentPitchInDrawer();
+}
+
+async function generatePitchForDrawer() {
+  if (!state.activeDrawerJob) return;
+
+  const job = state.activeDrawerJob;
+  const lang = document.getElementById('ai-lang-select').value;
+  const textEl = document.getElementById('drawer-pitch-text');
+  textEl.value = 'Generating tailored pitch with AI...';
+
+  try {
+    const res = await fetch('/api/ai/pitch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        job,
+        language: lang
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.pitchDataCache[job.id] = data;
+      renderCurrentPitchInDrawer();
+    } else {
+      textEl.value = 'Failed to generate pitch. Please check connection.';
+    }
+  } catch (err) {
+    textEl.value = 'Error generating pitch: ' + err.message;
+  }
+}
+
+function renderCurrentPitchInDrawer() {
+  if (!state.activeDrawerJob) return;
+  const data = state.pitchDataCache[state.activeDrawerJob.id];
+  if (!data) return;
+
+  const textEl = document.getElementById('drawer-pitch-text');
+  if (state.activePitchMode === 'letter') {
+    textEl.value = data.coverLetter || '';
+  } else if (state.activePitchMode === 'linkedin') {
+    textEl.value = data.linkedinNote || '';
+  } else if (state.activePitchMode === 'cold') {
+    textEl.value = data.coldEmail || '';
+  } else if (state.activePitchMode === 'tips') {
+    textEl.value = (data.cvTips || []).map((tip, idx) => `[Tip ${idx + 1}] ${tip}`).join('\n\n');
+  }
+}
+
+function copyDrawerPitch() {
+  const textEl = document.getElementById('drawer-pitch-text');
+  navigator.clipboard.writeText(textEl.value);
+  showToast('Copied to clipboard', 'check');
+}
+
+function openDrawerMailto() {
+  if (!state.activeDrawerJob) return;
+  const subject = encodeURIComponent(`Application: ${state.activeDrawerJob.title} — ${state.profile?.fullName || ''}`);
+  const body = encodeURIComponent(document.getElementById('drawer-pitch-text').value);
+  window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+}
+
+// ==================== KANBAN APPLICATION PIPELINE ====================
 async function loadApplications() {
   try {
     const res = await fetch('/api/applications');
@@ -313,29 +589,16 @@ async function loadApplications() {
     if (data.success && data.applications) {
       state.applications = data.applications;
       updateTrackerCount();
-      renderTracker();
+      renderKanbanBoard();
     }
-  } catch (err) {
-    console.error('Failed to load applications:', err);
+  } catch (e) {
+    console.error('Failed to load applications:', e);
   }
 }
 
 function updateTrackerCount() {
-  const badge = document.getElementById('tracker-count-badge');
+  const badge = document.getElementById('rail-tracker-count');
   if (badge) badge.textContent = state.applications.length;
-
-  const countAll = document.getElementById('t-count-all');
-  if (countAll) countAll.textContent = state.applications.length;
-
-  const counts = { Saved: 0, Applied: 0, Technical_Test: 0, Interview: 0, Offer: 0, Rejected: 0 };
-  state.applications.forEach(a => {
-    if (counts[a.status] !== undefined) counts[a.status]++;
-  });
-
-  ['Saved', 'Applied', 'Interview', 'Offer', 'Rejected'].forEach(s => {
-    const el = document.getElementById(`t-count-${s.toLowerCase()}`);
-    if (el) el.textContent = counts[s] || 0;
-  });
 
   // Check 7-day follow-up reminder
   const now = Date.now();
@@ -347,329 +610,193 @@ function updateTrackerCount() {
     return days >= 7;
   });
 
-  const reminderBanner = document.getElementById('followup-reminder-banner');
-  if (reminderBanner) {
+  const banner = document.getElementById('followup-reminder-banner');
+  const text = document.getElementById('followup-reminder-text');
+  if (banner && text) {
     if (needFollowUp.length > 0) {
-      reminderBanner.classList.remove('hidden');
-      document.getElementById('followup-reminder-text').innerHTML =
-        `⚠️ You have <strong>${needFollowUp.length} application(s)</strong> waiting over 7 days for a response (${needFollowUp.map(a => a.company).slice(0, 3).join(', ')}). Time to send a follow-up pitch!`;
+      banner.style.display = 'flex';
+      text.innerHTML = `You have <strong>${needFollowUp.length} application(s)</strong> waiting over 7 days for a response (${needFollowUp.map(a => a.company).slice(0, 3).join(', ')}). Time to send a follow-up pitch!`;
     } else {
-      reminderBanner.classList.add('hidden');
+      banner.style.display = 'none';
     }
   }
 }
 
-function toggleTrackerMode(mode) {
-  state.trackerMode = mode;
-  document.getElementById('btn-mode-kanban').className = mode === 'kanban' ? 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white' : 'px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-800 text-slate-400 hover:text-white';
-  document.getElementById('btn-mode-list').className = mode === 'list' ? 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white' : 'px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-800 text-slate-400 hover:text-white';
-  renderTracker();
-}
-
-function renderTracker() {
-  const kanbanContainer = document.getElementById('tracker-kanban-board');
-  const listContainer = document.getElementById('tracked-list');
-  const emptyState = document.getElementById('tracker-empty');
-
-  if (state.applications.length === 0) {
-    if (kanbanContainer) kanbanContainer.classList.add('hidden');
-    if (listContainer) listContainer.classList.add('hidden');
-    if (emptyState) emptyState.classList.remove('hidden');
-    return;
-  }
-
-  if (emptyState) emptyState.classList.add('hidden');
-
-  if (state.trackerMode === 'kanban') {
-    if (kanbanContainer) kanbanContainer.classList.remove('hidden');
-    if (listContainer) listContainer.classList.add('hidden');
-    renderKanbanBoard();
-  } else {
-    if (kanbanContainer) kanbanContainer.classList.add('hidden');
-    if (listContainer) listContainer.classList.remove('hidden');
-    renderListView();
-  }
-
-  if (window.lucide) lucide.createIcons();
-}
-
 const KANBAN_STAGES = [
-  { key: 'Saved', label: '🔖 Saved', color: 'border-slate-700 bg-slate-900/40 text-slate-300' },
-  { key: 'Applied', label: '📨 Applied', color: 'border-blue-500/30 bg-blue-950/20 text-blue-400' },
-  { key: 'Technical_Test', label: '💻 Tech Test', color: 'border-purple-500/30 bg-purple-950/20 text-purple-400' },
-  { key: 'Interview', label: '🎙️ Interview', color: 'border-amber-500/30 bg-amber-950/20 text-amber-400' },
-  { key: 'Offer', label: '🏆 Offer', color: 'border-emerald-500/30 bg-emerald-950/20 text-emerald-400' },
-  { key: 'Rejected', label: '❌ Rejected', color: 'border-rose-500/30 bg-rose-950/20 text-rose-400' }
+  { key: 'Saved', label: 'Saved' },
+  { key: 'Applied', label: 'Applied' },
+  { key: 'Technical_Test', label: 'Tech Test' },
+  { key: 'Interview', label: 'Interview' },
+  { key: 'Offer', label: 'Offer' },
+  { key: 'Rejected', label: 'Rejected' }
 ];
 
 function renderKanbanBoard() {
-  const container = document.getElementById('tracker-kanban-board');
-  if (!container) return;
+  const board = document.getElementById('kanban-board');
+  if (!board) return;
 
-  container.innerHTML = KANBAN_STAGES.map(stage => {
+  board.innerHTML = KANBAN_STAGES.map(stage => {
     const stageApps = state.applications.filter(a => a.status === stage.key);
     return `
-      <div class="kanban-col flex flex-col bg-surface-900/90 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-3 flex-shrink-0">
-        <div class="flex items-center justify-between pb-2 border-b border-slate-800">
-          <span class="text-xs font-bold ${stage.color} px-2.5 py-1 rounded-lg">${stage.label}</span>
-          <span class="text-xs font-mono text-slate-500">${stageApps.length}</span>
+      <div class="kanban-column">
+        <div class="kanban-col-header">
+          <span class="kanban-col-label">${stage.label}</span>
+          <span class="kanban-col-count">${stageApps.length}</span>
         </div>
-        <div class="space-y-3 overflow-y-auto max-h-[650px] pr-1">
-          ${stageApps.length === 0 ? `<p class="text-[11px] text-slate-600 text-center py-6">No applications</p>` : ''}
+        <div class="kanban-cards-stack">
+          ${stageApps.length === 0 ? '<p style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 24px 0;">No applications</p>' : ''}
           ${stageApps.map(app => renderKanbanCard(app, stage.key)).join('')}
         </div>
       </div>
     `;
   }).join('');
+
+  if (window.lucide) lucide.createIcons();
 }
 
 function renderKanbanCard(app, currentStage) {
-  const isAppliedStale = (currentStage === 'Applied' || currentStage === 'Technical_Test') && app.appliedAt &&
+  const isStale = (currentStage === 'Applied' || currentStage === 'Technical_Test') && app.appliedAt &&
     ((Date.now() - new Date(app.appliedAt).getTime()) / (1000 * 60 * 60 * 24)) >= 7;
 
   return `
-    <div class="kanban-card bg-surface-800 border ${isAppliedStale ? 'border-amber-500/60 followup-alert' : 'border-slate-700/70'} p-3.5 rounded-xl space-y-2.5 shadow-sm">
-      <div class="flex items-start justify-between gap-1">
+    <div class="kanban-job-card ${isStale ? 'followup-stale' : ''}">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 6px;">
         <div>
-          <h4 class="text-xs font-bold text-white line-clamp-1">${app.title}</h4>
-          <p class="text-[11px] text-slate-400 font-medium">${app.company}</p>
+          <h5 class="kanban-card-title">${app.title}</h5>
+          <span class="kanban-card-company">${app.company} • ${app.location || 'Remote'}</span>
         </div>
-        <button onclick="deleteApplication('${app.id}')" class="text-slate-500 hover:text-rose-400 text-xs p-1" title="Delete">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+        <button onclick="deleteApplication('${app.id}')" class="btn-action-icon" style="width: 20px; height: 20px;" title="Delete">
+          <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
         </button>
       </div>
 
-      ${isAppliedStale ? `<div class="p-1 rounded bg-amber-500/15 text-amber-400 text-[10px] font-semibold flex items-center space-x-1"><i data-lucide="alert-circle" class="w-3 h-3"></i><span>Applied > 7 days ago! Follow up</span></div>` : ''}
-
-      <div class="flex items-center justify-between text-[10px] text-slate-500 pt-1">
-        <span>📍 ${app.location || 'Remote'}</span>
-        <span>${formatRelativeTime(app.appliedAt || app.dateAdded)}</span>
-      </div>
-
-      <!-- Quick Move Selector -->
-      <div class="pt-2 border-t border-slate-700/60 flex items-center justify-between gap-1.5">
-        <select onchange="updateApplicationStatus('${app.id}', this.value)" class="w-full bg-surface-900 border border-slate-700 text-[11px] text-slate-300 rounded px-2 py-1 focus:outline-none">
-          ${KANBAN_STAGES.map(s => `<option value="${s.key}" ${s.key === currentStage ? 'selected' : ''}>Move to: ${s.label}</option>`).join('')}
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px; padding-top: 6px; border-top: 1px solid var(--border-subtle);">
+        <select onchange="updateApplicationStatus('${app.id}', this.value)" class="filter-select" style="height: 24px; font-size: 11px; padding: 0 18px 0 6px;">
+          ${KANBAN_STAGES.map(s => `<option value="${s.key}" ${s.key === currentStage ? 'selected' : ''}>${s.label}</option>`).join('')}
         </select>
-        ${app.url ? `<a href="${app.url}" target="_blank" class="p-1.5 rounded bg-surface-900 border border-slate-700 text-slate-400 hover:text-white" title="Open Job Link"><i data-lucide="external-link" class="w-3 h-3"></i></a>` : ''}
+        <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-muted);">${formatRelativeTime(app.appliedAt || app.dateAdded)}</span>
       </div>
     </div>
   `;
 }
 
-function renderListView() {
-  const container = document.getElementById('tracked-list');
-  if (!container) return;
+async function handleDrawerStatusChange(newStatus) {
+  if (!state.activeDrawerJob) return;
+  const job = state.activeDrawerJob;
 
-  const filtered = state.activeTrackerFilter === 'all'
-    ? state.applications
-    : state.applications.filter(a => a.status === state.activeTrackerFilter);
-
-  container.innerHTML = filtered.map(app => `
-    <div class="bg-surface-900 border border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
-      <div class="space-y-1">
-        <div class="flex items-center space-x-2">
-          <h3 class="font-bold text-white text-sm">${app.title}</h3>
-          <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-brand-500/20 text-brand-300">${app.status}</span>
-        </div>
-        <p class="text-xs text-slate-400">${app.company} • 📍 ${app.location || 'Remote'} • ${formatRelativeTime(app.appliedAt || app.dateAdded)}</p>
-      </div>
-      <div class="flex items-center space-x-2">
-        <select onchange="updateApplicationStatus('${app.id}', this.value)" class="bg-surface-800 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-300">
-          ${KANBAN_STAGES.map(s => `<option value="${s.key}" ${s.key === app.status ? 'selected' : ''}>${s.label}</option>`).join('')}
-        </select>
-        <a href="${app.url}" target="_blank" class="px-3 py-1.5 rounded bg-brand-600 text-white text-xs font-semibold flex items-center space-x-1">
-          <span>View Job</span>
-          <i data-lucide="external-link" class="w-3 h-3"></i>
-        </a>
-        <button onclick="deleteApplication('${app.id}')" class="p-1.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-        </button>
-      </div>
-    </div>
-  `).join('');
-}
-
-async function updateApplicationStatus(id, newStatus) {
-  try {
-    const res = await fetch(`/api/applications/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus })
+  if (newStatus === 'none') {
+    const existing = state.applications.find(a => a.url === job.url);
+    if (existing) await deleteApplication(existing.id);
+  } else {
+    await saveApplicationRecord({
+      jobId: job.id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      url: job.url,
+      source: job.source,
+      status: newStatus
     });
-    if (res.ok) {
-      await loadApplications();
-    }
-  } catch (err) {
-    console.error('Update status error:', err);
   }
 }
 
-async function deleteApplication(id) {
-  if (!confirm('Are you sure you want to delete this tracked application?')) return;
-  try {
-    const res = await fetch(`/api/applications/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      await loadApplications();
-    }
-  } catch (err) {
-    console.error('Delete app error:', err);
-  }
+async function toggleTrackJobByIndex(idx) {
+  const job = state.jobs[idx];
+  if (job) toggleTrackJob(job);
 }
 
 async function toggleTrackJob(job) {
   const existing = state.applications.find(a => a.url === job.url);
   if (existing) {
     await deleteApplication(existing.id);
+    showToast(`Removed from pipeline`, 'bookmark-x');
   } else {
-    try {
-      const res = await fetch('/api/applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId: job.id,
-          title: job.title,
-          company: job.company,
-          location: job.location,
-          url: job.url,
-          source: job.source,
-          status: 'Saved'
-        })
-      });
-      if (res.ok) {
-        await loadApplications();
-        renderJobCards(state.jobs);
-      }
-    } catch (err) {
-      console.error('Track error:', err);
-    }
+    await saveApplicationRecord({
+      jobId: job.id,
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      url: job.url,
+      source: job.source,
+      status: 'Saved'
+    });
+    showToast(`Saved to pipeline`, 'bookmark-check');
   }
 }
 
-async function autoTrackApplied(job) {
-  const existing = state.applications.find(a => a.url === job.url);
-  if (!existing) {
-    try {
-      await fetch('/api/applications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId: job.id,
-          title: job.title,
-          company: job.company,
-          location: job.location,
-          url: job.url,
-          source: job.source,
-          status: 'Applied'
-        })
-      });
-      await loadApplications();
-    } catch (e) {}
-  }
-}
-
-// ==================== AI PITCH & MULTI-TAB MODAL ====================
-async function openAIPitchModal(job) {
-  state.activeModalJob = job;
-  const modal = document.getElementById('modal-email');
-  if (modal) modal.classList.remove('hidden');
-
-  document.getElementById('modal-job-title').textContent = `${job.title} @ ${job.company}`;
-  document.getElementById('modal-body').value = 'Generating tailored pitch with AI...';
-
-  await generatePitchContent();
-}
-
-async function generatePitchContent() {
-  if (!state.activeModalJob) return;
-
-  const lang = document.getElementById('modal-pitch-lang')?.value || 'English';
-  const customNotes = document.getElementById('modal-custom-notes')?.value || '';
-
+async function saveApplicationRecord(payload) {
   try {
-    const res = await fetch('/api/ai/pitch', {
+    const res = await fetch('/api/applications', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        job: state.activeModalJob,
-        language: lang,
-        customNotes
-      })
+      body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (data.success) {
-      state.currentPitchData = data;
-      renderPitchTab(state.activePitchTab);
+    if (res.ok) {
+      await loadApplications();
+      renderJobFeed(state.jobs);
     }
-  } catch (err) {
-    document.getElementById('modal-body').value = 'Failed to generate pitch. Please check connection.';
+  } catch (e) {
+    console.error('Failed to save application:', e);
   }
 }
 
-function setPitchTab(tab) {
-  state.activePitchTab = tab;
-  ['letter', 'linkedin', 'cold', 'tips'].forEach(t => {
-    const btn = document.getElementById(`tab-pitch-${t}`);
-    if (btn) {
-      btn.className = t === tab
-        ? 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white'
-        : 'px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-surface-800';
-    }
-  });
-  renderPitchTab(tab);
-}
-
-function renderPitchTab(tab) {
-  if (!state.currentPitchData) return;
-  const bodyEl = document.getElementById('modal-body');
-  const subjectEl = document.getElementById('modal-subject');
-
-  if (tab === 'letter') {
-    subjectEl.value = `Application: ${state.activeModalJob.title} — ${state.profile?.fullName || 'Candidate'}`;
-    bodyEl.value = state.currentPitchData.coverLetter || '';
-  } else if (tab === 'linkedin') {
-    subjectEl.value = 'LinkedIn Recruiter Note (< 300 characters)';
-    bodyEl.value = state.currentPitchData.linkedinNote || '';
-  } else if (tab === 'cold') {
-    subjectEl.value = `Direct Inquiry: ${state.activeModalJob.title}`;
-    bodyEl.value = state.currentPitchData.coldEmail || '';
-  } else if (tab === 'tips') {
-    subjectEl.value = '3 Specific CV Alignment Tips for this Role';
-    bodyEl.value = (state.currentPitchData.cvTips || []).map((tip, idx) => `[Tip ${idx + 1}] ${tip}`).join('\n\n');
+async function updateApplicationStatus(id, status) {
+  try {
+    await fetch(`/api/applications/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    await loadApplications();
+    showToast(`Moved to ${status}`, 'check');
+  } catch (e) {
+    console.error(e);
   }
 }
 
-function closeEmailModal() {
-  const modal = document.getElementById('modal-email');
-  if (modal) modal.classList.add('hidden');
-}
-
-function copyPitchText() {
-  const body = document.getElementById('modal-body');
-  navigator.clipboard.writeText(body.value);
-  const btn = document.getElementById('btn-copy-pitch');
-  if (btn) {
-    btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i><span>Copied!</span>`;
-    setTimeout(() => {
-      btn.innerHTML = `<i data-lucide="copy" class="w-3.5 h-3.5"></i><span>Copy Pitch</span>`;
-      if (window.lucide) lucide.createIcons();
-    }, 2000);
+async function deleteApplication(id) {
+  try {
+    await fetch(`/api/applications/${id}`, { method: 'DELETE' });
+    await loadApplications();
+    renderJobFeed(state.jobs);
+  } catch (e) {
+    console.error(e);
   }
-}
-
-function openMailtoClient() {
-  const subject = encodeURIComponent(document.getElementById('modal-subject').value);
-  const body = encodeURIComponent(document.getElementById('modal-body').value);
-  window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
 }
 
 // ==================== CV PDF UPLOAD & PARSER ====================
+function setupCvDropzone() {
+  const dropzone = document.getElementById('cv-dropzone');
+  const fileInput = document.getElementById('cv-file-input');
+  if (!dropzone || !fileInput) return;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'var(--accent-primary)';
+  });
+
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.style.borderColor = 'var(--border-strong)';
+  });
+
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'var(--border-strong)';
+    if (e.dataTransfer.files.length) {
+      fileInput.files = e.dataTransfer.files;
+      handleCvUpload({ target: fileInput });
+    }
+  });
+}
+
 async function handleCvUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
 
   const statusEl = document.getElementById('cv-upload-status');
-  if (statusEl) statusEl.innerHTML = `<span class="text-indigo-400 animate-pulse">Extracting text & skills...</span>`;
+  if (statusEl) statusEl.innerHTML = `<span style="color: var(--accent-primary);">Extracting skills with PDF parser...</span>`;
 
   const formData = new FormData();
   formData.append('cv', file);
@@ -681,14 +808,15 @@ async function handleCvUpload(e) {
     });
     const data = await res.json();
     if (data.success) {
-      if (statusEl) statusEl.innerHTML = `<span class="text-emerald-400 font-semibold">✓ Parsed ${data.detectedSkills.length} skills successfully!</span>`;
+      if (statusEl) statusEl.innerHTML = `<span style="color: var(--match-high-fg);">✓ Parsed ${data.detectedSkills.length} skills successfully!</span>`;
+      showToast(`Parsed ${data.detectedSkills.length} skills from resume`, 'file-check');
       await loadUserProfile();
       triggerSearch();
     } else {
-      if (statusEl) statusEl.innerHTML = `<span class="text-rose-400">${data.error || 'Upload failed'}</span>`;
+      if (statusEl) statusEl.innerHTML = `<span style="color: var(--danger-fg);">${data.error || 'Upload failed'}</span>`;
     }
   } catch (err) {
-    if (statusEl) statusEl.innerHTML = `<span class="text-rose-400">Upload error: ${err.message}</span>`;
+    if (statusEl) statusEl.innerHTML = `<span style="color: var(--danger-fg);">Upload error: ${err.message}</span>`;
   }
 }
 
@@ -700,11 +828,10 @@ async function loadUserProfile() {
       state.profile = data.profile;
       document.getElementById('prof-name').value = data.profile.fullName || '';
       document.getElementById('prof-title').value = data.profile.title || '';
-      document.getElementById('prof-school').value = data.profile.school || data.profile.educationSummary || '';
+      document.getElementById('prof-school').value = data.profile.educationSummary || '';
       document.getElementById('prof-email').value = data.profile.email || '';
       document.getElementById('prof-phone').value = data.profile.phone || '';
       document.getElementById('prof-portfolio').value = data.profile.portfolioUrl || '';
-      document.getElementById('prof-linkedin').value = data.profile.linkedinUrl || '';
       document.getElementById('prof-skills').value = data.profile.skills || '';
     }
   } catch (e) {}
@@ -719,7 +846,6 @@ async function saveUserProfile(e) {
     email: document.getElementById('prof-email').value,
     phone: document.getElementById('prof-phone').value,
     portfolioUrl: document.getElementById('prof-portfolio').value,
-    linkedinUrl: document.getElementById('prof-linkedin').value,
     skills: document.getElementById('prof-skills').value
   };
 
@@ -732,9 +858,10 @@ async function saveUserProfile(e) {
     if (res.ok) {
       const msg = document.getElementById('profile-saved-msg');
       if (msg) {
-        msg.classList.remove('hidden');
-        setTimeout(() => msg.classList.add('hidden'), 2500);
+        msg.style.display = 'inline';
+        setTimeout(() => msg.style.display = 'none', 2000);
       }
+      showToast('Profile updated', 'check');
       await loadUserProfile();
       triggerSearch();
     }
@@ -743,14 +870,14 @@ async function saveUserProfile(e) {
   }
 }
 
-// ==================== PROVIDER HEALTH & OBSERVABILITY ====================
+// ==================== OBSERVABILITY & CUSTOM PROVIDERS ====================
 async function loadProviderHealth() {
   try {
     const res = await fetch('/api/providers/health');
     const data = await res.json();
     if (data.success && data.health) {
       state.health = data.health;
-      const pill = document.getElementById('health-summary-pill');
+      const pill = document.getElementById('rail-health-pill');
       if (pill) {
         const live = data.health.healthyCount || 19;
         const total = data.health.totalProvidersMonitored || 19;
@@ -760,126 +887,69 @@ async function loadProviderHealth() {
   } catch (e) {}
 }
 
-function openHealthModal() {
-  const modal = document.getElementById('modal-health');
-  if (modal) modal.classList.remove('hidden');
-  renderHealthTable();
-}
-
-function closeHealthModal() {
-  const modal = document.getElementById('modal-health');
-  if (modal) modal.classList.add('hidden');
-}
-
 function renderHealthTable() {
-  const container = document.getElementById('health-table-body');
-  if (!container || !state.health) return;
+  const tbody = document.getElementById('health-table-body');
+  if (!tbody || !state.health) return;
 
-  container.innerHTML = (state.health.providers || []).map(p => `
-    <tr class="border-b border-slate-800 text-xs">
-      <td class="py-2.5 font-semibold text-white">${p.name}</td>
-      <td class="py-2.5">
-        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${p.status === 'ok' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}">
-          ● ${p.status.toUpperCase()}
-        </span>
+  tbody.innerHTML = (state.health.providers || []).map(p => `
+    <tr style="border-bottom: 1px solid var(--border-subtle);">
+      <td style="padding: 10px 14px; font-weight: 500; color: var(--text-primary);">${p.name}</td>
+      <td style="padding: 10px 14px;">
+        <span class="match-score-pill ${p.status === 'ok' ? 'high' : 'low'}" style="font-size: 10px;">${p.status.toUpperCase()}</span>
       </td>
-      <td class="py-2.5 text-slate-300 font-mono">${p.jobsCount || 0}</td>
-      <td class="py-2.5 text-slate-400 font-mono">${p.latencyMs ? `${p.latencyMs}ms` : '< 1s'}</td>
-      <td class="py-2.5 text-slate-500 text-[11px]">${p.errorMessage ? p.errorMessage.slice(0, 40) : 'None'}</td>
+      <td style="padding: 10px 14px; font-family: var(--font-mono);">${p.jobsCount || 0}</td>
+      <td style="padding: 10px 14px; font-family: var(--font-mono); color: var(--text-muted);">${p.latencyMs ? `${p.latencyMs}ms` : '<1s'}</td>
+      <td style="padding: 10px 14px; color: var(--text-muted); font-size: 11px;">${p.errorMessage ? p.errorMessage.slice(0, 45) : 'None'}</td>
     </tr>
   `).join('');
 }
 
-// ==================== SETTINGS MODAL ====================
-function openSettingsModal() {
-  const modal = document.getElementById('modal-settings');
-  if (modal) modal.classList.remove('hidden');
-}
-
-function closeSettingsModal() {
-  const modal = document.getElementById('modal-settings');
-  if (modal) modal.classList.add('hidden');
-}
-
-// Morocco Directory Quick Search Actions
-function searchDirectCompany(company) {
-  switchTab('jobs');
-  document.getElementById('input-keywords').value = company;
-  document.getElementById('select-location').value = 'Morocco';
-  document.getElementById('select-source').value = 'all';
-  triggerSearch();
-}
-
-function searchByProvider(provider) {
-  switchTab('jobs');
-  document.getElementById('select-source').value = provider;
-  document.getElementById('select-location').value = 'Morocco';
-  triggerSearch();
-}
-
-// Custom Providers Management
-async function openCustomProvidersModal() {
-  const modal = document.getElementById('modal-custom-providers');
-  if (modal) modal.classList.remove('hidden');
-  await loadCustomProvidersList();
-}
-
-function closeCustomProvidersModal() {
-  const modal = document.getElementById('modal-custom-providers');
-  if (modal) modal.classList.add('hidden');
-}
-
-async function loadCustomProvidersList() {
-  const container = document.getElementById('custom-providers-list');
-  if (!container) return;
-
+async function loadCustomProviders() {
   try {
     const res = await fetch('/api/custom-providers');
     const data = await res.json();
     if (data.success && data.providers) {
-      if (data.providers.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-500 py-4 text-center">No custom providers added yet. Paste an RSS or JSON URL below!</p>`;
-        return;
-      }
-
-      container.innerHTML = data.providers.map(p => `
-        <div class="flex items-center justify-between p-3 rounded-xl bg-surface-800 border border-slate-700/60">
-          <div class="space-y-0.5">
-            <div class="flex items-center space-x-2">
-              <span class="text-xs font-bold text-white">${p.name}</span>
-              <span class="px-1.5 py-0.2 rounded text-[10px] uppercase font-mono ${p.type === 'rss' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}">${p.type}</span>
-              <span class="text-[10px] ${p.active ? 'text-emerald-400' : 'text-slate-500'}">● ${p.active ? 'Active' : 'Disabled'}</span>
-            </div>
-            <p class="text-[11px] text-slate-400 font-mono truncate max-w-sm sm:max-w-md">${p.url}</p>
-          </div>
-          <div class="flex items-center space-x-2">
-            <button onclick="handleToggleCustomProvider('${p.id}')" class="px-2 py-1 text-xs rounded bg-surface-900 border border-slate-700 hover:text-white text-slate-300">
-              ${p.active ? 'Disable' : 'Enable'}
-            </button>
-            <button onclick="handleDeleteCustomProvider('${p.id}')" class="p-1 text-xs rounded bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/20">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            </button>
-          </div>
-        </div>
-      `).join('');
-
-      if (window.lucide) lucide.createIcons();
+      state.customProviders = data.providers;
+      renderCustomProvidersList();
     }
-  } catch (err) {
-    console.error('Failed to load custom providers:', err);
-  }
+  } catch (e) {}
 }
 
-async function handleAddCustomProvider(e) {
-  if (e) e.preventDefault();
-  const name = document.getElementById('input-provider-name').value.trim();
-  const url = document.getElementById('input-provider-url').value.trim();
-  const type = document.getElementById('select-provider-type').value;
+function renderCustomProvidersList() {
+  const container = document.getElementById('custom-providers-list');
+  if (!container) return;
 
-  if (!name || !url) {
-    alert('Please provide a provider name and URL.');
+  if (state.customProviders.length === 0) {
+    container.innerHTML = `<p style="font-size: 12px; color: var(--text-muted); padding: 8px 0;">No custom feeds added yet. Add an RSS XML or JSON endpoint.</p>`;
     return;
   }
+
+  container.innerHTML = state.customProviders.map(p => `
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--bg-canvas); border: 1px solid var(--border-subtle);">
+      <div>
+        <span style="font-size: 12.5px; font-weight: 500; color: var(--text-primary);">${p.name}</span>
+        <span class="contract-pill" style="margin-left: 6px;">${p.type}</span>
+        <p style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); margin-top: 2px;">${p.url}</p>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <button onclick="toggleCustomProvider('${p.id}')" class="btn-action-icon" style="width: auto; padding: 0 8px; font-size: 11px; height: 26px;">
+          ${p.active ? 'Disable' : 'Enable'}
+        </button>
+        <button onclick="deleteCustomProvider('${p.id}')" class="btn-action-icon" style="width: 26px; height: 26px;">
+          <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  if (window.lucide) lucide.createIcons();
+}
+
+async function handleAddFeedSubmit(e) {
+  if (e) e.preventDefault();
+  const name = document.getElementById('feed-name-input').value.trim();
+  const url = document.getElementById('feed-url-input').value.trim();
+  const type = document.getElementById('feed-type-select').value;
 
   try {
     const res = await fetch('/api/custom-providers', {
@@ -887,44 +957,80 @@ async function handleAddCustomProvider(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, url, type })
     });
-    const data = await res.json();
-    if (data.success) {
-      document.getElementById('input-provider-name').value = '';
-      document.getElementById('input-provider-url').value = '';
-      await loadCustomProvidersList();
+    if (res.ok) {
+      closeAddFeedModal();
+      showToast(`Added feed "${name}"`, 'check');
+      await loadCustomProviders();
       triggerSearch();
-    } else {
-      alert(data.error || 'Failed to add provider');
     }
   } catch (err) {
-    alert('Error adding provider: ' + err.message);
+    showToast('Failed to add feed', 'alert-circle');
   }
 }
 
-async function handleToggleCustomProvider(id) {
+async function toggleCustomProvider(id) {
   try {
     await fetch(`/api/custom-providers/${id}/toggle`, { method: 'PATCH' });
-    await loadCustomProvidersList();
+    await loadCustomProviders();
     triggerSearch();
-  } catch (err) {
-    console.error('Toggle error:', err);
-  }
+  } catch (e) {}
 }
 
-async function handleDeleteCustomProvider(id) {
-  if (!confirm('Are you sure you want to remove this provider?')) return;
+async function deleteCustomProvider(id) {
+  if (!confirm('Remove this custom provider?')) return;
   try {
     await fetch(`/api/custom-providers/${id}`, { method: 'DELETE' });
-    await loadCustomProvidersList();
+    await loadCustomProviders();
     triggerSearch();
-  } catch (err) {
-    console.error('Delete error:', err);
-  }
+  } catch (e) {}
 }
 
-function addPresetFeed(name, url, type = 'rss') {
-  document.getElementById('input-provider-name').value = name;
-  document.getElementById('input-provider-url').value = url;
-  document.getElementById('select-provider-type').value = type;
-  handleAddCustomProvider();
+// Quick Search from Directory
+function searchDirectCompany(company) {
+  switchView('jobs');
+  document.getElementById('cmd-search-input').value = company;
+  document.getElementById('filter-location').value = 'Morocco';
+  document.getElementById('filter-source').value = 'all';
+  triggerSearch();
+}
+
+// ==================== MODALS & TOAST STACK ====================
+function openShortcutsModal() {
+  document.getElementById('modal-shortcuts').classList.add('open');
+}
+
+function closeShortcutsModal(e) {
+  if (e && e.target !== e.currentTarget && !e.target.closest('.drawer-close-btn')) return;
+  document.getElementById('modal-shortcuts').classList.remove('open');
+}
+
+function openAddFeedModal() {
+  document.getElementById('modal-add-feed').classList.add('open');
+}
+
+function closeAddFeedModal(e) {
+  if (e && e.target !== e.currentTarget && !e.target.closest('.drawer-close-btn') && !e.target.closest('button[type="button"]')) return;
+  document.getElementById('modal-add-feed').classList.remove('open');
+}
+
+function showToast(message, icon = 'info') {
+  const stack = document.getElementById('toast-stack');
+  if (!stack) return;
+
+  const toast = document.createElement('div');
+  toast.className = 'toast-item';
+  toast.innerHTML = `
+    <i data-lucide="${icon}" style="width: 15px; height: 15px; color: var(--accent-primary);"></i>
+    <span>${message}</span>
+  `;
+  stack.appendChild(toast);
+
+  if (window.lucide) lucide.createIcons();
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(10px)';
+    toast.style.transition = 'all 160ms ease';
+    setTimeout(() => toast.remove(), 180);
+  }, 2600);
 }
