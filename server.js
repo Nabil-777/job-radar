@@ -9,6 +9,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const fs = require('fs');
 const swaggerUi = require('swagger-ui-express');
 const openapiSpec = require('./src/docs/openapi.json');
 
@@ -103,7 +104,17 @@ app.use('/api/cover-letter/', aiLimiter);
 
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve Frontend: SvelteKit 5 production build if available, fallback to legacy public
+const frontendBuildDir = path.join(__dirname, 'frontend', 'build');
+const publicDir = path.join(__dirname, 'public');
+const activeStaticDir = fs.existsSync(path.join(frontendBuildDir, 'index.html'))
+  ? frontendBuildDir
+  : publicDir;
+
+app.use(express.static(activeStaticDir));
+if (activeStaticDir === frontendBuildDir) {
+  app.use('/legacy', express.static(publicDir));
+}
 
 // Interactive OpenAPI Documentation (P3 Task 13)
 app.get('/api/docs/openapi.json', (req, res) => res.json(openapiSpec));
@@ -150,7 +161,10 @@ app.get('/api/export/applications', (req, res) => {
 // SPA Fallback
 app.use((req, res, next) => {
   if (req.method === 'GET' && !req.path.startsWith('/api')) {
-    return res.sendFile('index.html', { root: path.join(__dirname, 'public') });
+    if (req.path.startsWith('/legacy')) {
+      return res.sendFile('index.html', { root: publicDir });
+    }
+    return res.sendFile('index.html', { root: activeStaticDir });
   }
   next();
 });

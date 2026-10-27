@@ -9,7 +9,10 @@
     "test": "node --test tests/**/*.test.js",
     "test:coverage": "c8 npm test",
     "lint": "node -e \"const fs = require('fs'), path = require('path'), cp = require('child_process'); function check(dir) { fs.readdirSync(dir, { withFileTypes: true }).forEach(d => { const p = path.join(dir, d.name); if (d.isDirectory() && d.name !== 'node_modules' && d.name !== '.git') check(p); else if (d.isFile() && p.endsWith('.js')) cp.execSync('node --check \\\"' + p + '\\\"'); }); } check('.'); console.log('Lint passed: all JS syntax valid');\"",
-    "lint:openapi": "node scripts/lintOpenApi.js"
+    "lint:openapi": "node scripts/lintOpenApi.js",
+    "build:frontend": "pnpm --prefix frontend build",
+    "dev:frontend": "pnpm --prefix frontend dev",
+    "build": "pnpm --prefix frontend build"
   },
   "keywords": [],
   "author": "",
