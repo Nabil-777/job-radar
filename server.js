@@ -25,9 +25,19 @@ const aiRoutes = require('./src/routes/ai.routes');
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Security Middleware
+// Security Middleware (P0 Task 3: Content Security Policy)
 app.use(helmet({
-  contentSecurityPolicy: false, // Allows inline script evaluation for Tailwind CDN & Lucide
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://unpkg.com"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.tailwindcss.com", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"]
+    }
+  },
   crossOriginEmbedderPolicy: false
 }));
 
