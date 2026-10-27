@@ -1,24 +1,13 @@
-const cheerio = require('cheerio');
-const { httpClient } = require('../../utils/httpClient');
-const { normalizeDate } = require('../../utils/dateNormalizer');
-const { generateFingerprint } = require('../../utils/fingerprint');
+const { BaseScraper } = require('./baseScraper');
+const scraper = new BaseScraper('Dreamjob.ma');
 
-/**
- * Scrapes Dreamjob.ma (Moroccan IT jobs, Enterprise stages, Concours OCP, ONCF, etc.)
- */
-async function searchDreamjob({ keywords = '', experienceLevel = 'all', limit = 15 }) {
+async function searchDreamjob({ keywords = '', experienceLevel = 'all', limit = 15 } = {}) {
   try {
     let kw = keywords.trim();
-    if (experienceLevel === 'internship') {
-      kw = kw ? `stage ${kw}` : 'stage informatique';
-    } else if (!kw) {
-      kw = 'informatique';
-    }
+    if (experienceLevel === 'internship') kw = kw ? `stage ${kw}` : 'stage informatique';
+    else if (!kw) kw = 'informatique';
 
-    const url = `https://www.dreamjob.ma/?s=${encodeURIComponent(kw)}`;
-    const res = await httpClient.get(url);
-
-    const $ = cheerio.load(res.data);
+    const $ = await scraper.fetchHtml(`https://www.dreamjob.ma/?s=${encodeURIComponent(kw)}`);
     const jobs = [];
     const kwLower = keywords.toLowerCase().trim();
 
@@ -27,66 +16,32 @@ async function searchDreamjob({ keywords = '', experienceLevel = 'all', limit = 
       const a = $(el).is('a') ? $(el) : $(el).find('a').first();
       const title = a.text().replace(/\s+/g, ' ').trim();
       const link = a.attr('href');
-
       if (!title || !link || !link.startsWith('http') || title.length < 12) return;
+      if (kwLower && kwLower !== 'software engineer' && !title.toLowerCase().includes(kwLower)) return;
 
-      const lowerTitle = title.toLowerCase();
-
-      if (kwLower && kwLower !== 'software engineer' && !lowerTitle.includes(kwLower)) {
-        return;
-      }
-
-      let detectedLevel = 'Entry / Mid';
-      const isIntern = lowerTitle.includes('stage') || lowerTitle.includes('pfe') || lowerTitle.includes('stagiaire');
-      const isJunior = lowerTitle.includes('junior') || lowerTitle.includes('débutant') || lowerTitle.includes('technicien');
-      const isSenior = lowerTitle.includes('senior') || lowerTitle.includes('cadre') || lowerTitle.includes('chef') || lowerTitle.includes('docteur');
-
-      if (isIntern) detectedLevel = 'Internship';
-      else if (isJunior) detectedLevel = 'Entry Level / Junior';
-      else if (isSenior) detectedLevel = 'Senior';
-
-      if (experienceLevel === 'internship' && !isIntern) return;
-      if (experienceLevel === 'entry' && !isJunior && !isIntern) return;
-
-      // Extract company name if in title e.g. "SEWS ouvre des stages..." or "Concours LPEE"
-      let company = 'Recrutement Maroc (Secteur Privé / Public)';
       const words = title.split(' ');
-      if (words.length > 0 && words[0].length > 2) company = words[0];
+      const company = (words.length > 0 && words[0].length > 2) ? words[0] : 'Recrutement Maroc';
 
-      const dateText = $(el).find('time, .date, .entry-date').text().trim();
-
-      const jobItem = {
+      const job = scraper.normalize({
         id: `dreamjob-${Buffer.from(link).toString('hex').slice(0, 10)}`,
         title,
         company,
-        location: 'Morocco (National)',
+        location: 'Maroc',
         url: link,
-        datePosted: normalizeDate(dateText),
-        logo: '',
-        source: 'Dreamjob.ma',
-        experienceLevel: detectedLevel,
-        contractType: isIntern ? 'Stage / PFE' : 'Concours / CDI',
+        datePosted: $(el).find('time, .date').text().trim(),
         remote: false,
-        tags: ['Dreamjob', 'Maroc', isIntern ? 'stage' : 'concours']
-      };
+        tags: ['dreamjob', 'maroc'],
+        descriptionSnippet: $(el).find('p, .entry-content').text().trim() || title
+      });
 
-      jobItem.fingerprint = generateFingerprint(jobItem);
-      jobs.push(jobItem);
+      if (experienceLevel === 'internship' && job.experienceLevel !== 'Internship') return;
+      if (experienceLevel === 'entry' && !['Entry Level / Junior', 'Internship'].includes(job.experienceLevel)) return;
+      if (experienceLevel === 'senior' && job.experienceLevel !== 'Senior') return;
+
+      jobs.push(job);
     });
-
-    // Deduplicate
-    const unique = [];
-    const seen = new Set();
-    for (const j of jobs) {
-      if (!seen.has(j.url)) {
-        seen.add(j.url);
-        unique.push(j);
-      }
-    }
-
-    return unique;
+    return jobs;
   } catch (err) {
-    console.error('[Dreamjob] Scraper error:', err.message);
     return [];
   }
 }

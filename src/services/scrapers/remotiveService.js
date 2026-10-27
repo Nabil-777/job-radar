@@ -1,61 +1,42 @@
-const axios = require('axios');
+const { BaseScraper } = require('./baseScraper');
+const scraper = new BaseScraper('Remotive');
 
-/**
- * Searches Remotive API for remote developer, AI, cybersecurity, and tech jobs
- */
-async function searchRemotive({ keywords = '', category = '', experienceLevel = 'all', limit = 30 }) {
+async function searchRemotive({ keywords = '', category = '', experienceLevel = 'all', limit = 30 } = {}) {
   try {
-    let url = 'https://remotive.com/api/remote-jobs';
-    const params = [];
-    if (keywords) params.push(`search=${encodeURIComponent(keywords)}`);
-    if (category) params.push(`category=${encodeURIComponent(category)}`);
-    if (params.length > 0) url += `?${params.join('&')}`;
-
-    const res = await axios.get(url, { timeout: 8000 });
-    const rawJobs = res.data?.jobs || [];
-
+    const params = new URLSearchParams();
+    if (keywords) params.append('search', keywords);
+    if (category) params.append('category', category);
+    const qs = params.toString();
+    const data = await scraper.fetchJson(`https://remotive.com/api/remote-jobs${qs ? '?' + qs : ''}`);
+    const rawJobs = data?.jobs || [];
     const jobs = [];
+
     for (const j of rawJobs) {
       if (jobs.length >= limit) break;
+      if (!j.title) continue;
 
-      const title = j.title || '';
-      const lowerTitle = title.toLowerCase();
-      const lowerDesc = (j.description || '').toLowerCase();
-
-      // Experience level filtering
-      let detectedLevel = 'Entry / Mid';
-      const isIntern = lowerTitle.includes('intern') || lowerTitle.includes('trainee') || lowerDesc.includes('internship');
-      const isJunior = lowerTitle.includes('junior') || lowerTitle.includes('entry') || lowerTitle.includes('graduat') || lowerDesc.includes('0-2 years') || lowerDesc.includes('entry level');
-      const isSenior = lowerTitle.includes('senior') || lowerTitle.includes('lead') || lowerTitle.includes('principal') || lowerTitle.includes('staff');
-
-      if (isIntern) detectedLevel = 'Internship';
-      else if (isJunior) detectedLevel = 'Entry Level / Junior';
-      else if (isSenior) detectedLevel = 'Senior';
-
-      if (experienceLevel === 'internship' && !isIntern) continue;
-      if (experienceLevel === 'entry' && !isJunior && !isIntern) continue;
-      if (experienceLevel === 'senior' && !isSenior) continue;
-
-      jobs.push({
+      const job = scraper.normalize({
         id: `remotive-${j.id}`,
         title: j.title,
-        company: j.company_name,
+        company: j.company_name || 'Tech Company',
         location: j.candidate_required_location || 'Remote (Worldwide)',
         url: j.url,
-        datePosted: j.publication_date ? j.publication_date.split('T')[0] : 'Recently',
+        datePosted: j.publication_date,
         logo: j.company_logo || '',
-        source: 'Remotive',
-        experienceLevel: detectedLevel,
         remote: true,
         tags: j.tags || [],
         salary: j.salary || '',
-        descriptionSnippet: (j.description || '').replace(/<[^>]*>?/gm, '').slice(0, 200) + '...'
+        descriptionSnippet: j.description || ''
       });
-    }
 
+      if (experienceLevel === 'internship' && job.experienceLevel !== 'Internship') continue;
+      if (experienceLevel === 'entry' && !['Entry Level / Junior', 'Internship'].includes(job.experienceLevel)) continue;
+      if (experienceLevel === 'senior' && job.experienceLevel !== 'Senior') continue;
+
+      jobs.push(job);
+    }
     return jobs;
   } catch (err) {
-    console.error('Remotive API error:', err.message);
     return [];
   }
 }

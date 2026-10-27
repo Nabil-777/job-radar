@@ -1,86 +1,42 @@
-const axios = require('axios');
+const { BaseScraper } = require('./baseScraper');
+const scraper = new BaseScraper('HackerNews (YC)');
 
-/**
- * Fetches hiring postings from the latest Y Combinator / Hacker News "Who is hiring?" thread
- */
-async function searchHackerNews({ keywords = '', experienceLevel = 'all', limit = 15 }) {
+async function searchHackerNews({ keywords = '', experienceLevel = 'all', limit = 15 } = {}) {
   try {
-    const userRes = await axios.get('https://hacker-news.firebaseio.com/v0/user/whoishiring.json', { timeout: 6000 });
-    const user = userRes.data;
-    if (!user || !user.submitted || user.submitted.length === 0) return [];
-
-    const threadId = user.submitted[0];
-    const threadRes = await axios.get(`https://hacker-news.firebaseio.com/v0/item/${threadId}.json`, { timeout: 6000 });
-    const kids = threadRes.data?.kids || [];
+    const user = await scraper.fetchJson('https://hacker-news.firebaseio.com/v0/user/whoishiring.json');
+    if (!user?.submitted?.length) return [];
+    const thread = await scraper.fetchJson(`https://hacker-news.firebaseio.com/v0/item/${user.submitted[0]}.json`);
+    const comments = await Promise.all(
+      (thread?.kids || []).slice(0, 25).map(id => scraper.fetchJson(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).catch(() => null))
+    );
 
     const jobs = [];
     const kwLower = keywords.toLowerCase().trim();
-
-    // Fetch first 30 top comments
-    const topKids = kids.slice(0, 35);
-    const commentPromises = topKids.map(id =>
-      axios.get(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, { timeout: 5000 })
-           .then(r => r.data)
-           .catch(() => null)
-    );
-
-    const comments = await Promise.all(commentPromises);
-
     for (const c of comments) {
-      if (!c || !c.text) continue;
-      if (jobs.length >= limit) break;
-
+      if (!c?.text || jobs.length >= limit) continue;
       const rawText = c.text.replace(/<[^>]*>?/gm, ' ').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
-      const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-      const firstLine = lines[0] || rawText.slice(0, 80);
+      const parts = (rawText.split('\n')[0] || rawText.slice(0, 80)).split('|').map(p => p.trim());
+      if (kwLower && !rawText.toLowerCase().includes(kwLower)) continue;
 
-      // Extract Company and Title from header like "Stripe | Software Engineer | San Francisco | REMOTE"
-      const parts = firstLine.split('|').map(p => p.trim());
-      const company = parts[0] || 'Tech Startup (YC)';
-      const title = parts[1] || 'Software / AI Engineer';
-      const loc = parts[2] || 'Remote / Hybrid';
-
-      const fullLower = rawText.toLowerCase();
-
-      if (kwLower) {
-        const matches = fullLower.includes(kwLower);
-        if (!matches) continue;
-      }
-
-      let detectedLevel = 'Entry / Mid';
-      const isIntern = fullLower.includes('intern') || fullLower.includes('internship');
-      const isJunior = fullLower.includes('junior') || fullLower.includes('entry');
-      const isSenior = fullLower.includes('senior') || fullLower.includes('lead');
-
-      if (isIntern) detectedLevel = 'Internship';
-      else if (isJunior) detectedLevel = 'Entry Level / Junior';
-      else if (isSenior) detectedLevel = 'Senior';
-
-      if (experienceLevel === 'internship' && !isIntern) continue;
-      if (experienceLevel === 'entry' && !isJunior && !isIntern) continue;
-
-      const dateStr = c.time ? new Date(c.time * 1000).toISOString().split('T')[0] : 'Recently';
-      const hnUrl = `https://news.ycombinator.com/item?id=${c.id}`;
-
-      jobs.push({
+      const job = scraper.normalize({
         id: `hn-${c.id}`,
-        title: `${title} (${company})`,
-        company,
-        location: loc,
-        url: hnUrl,
-        datePosted: dateStr,
-        logo: '',
-        source: 'HackerNews (YC)',
-        experienceLevel: detectedLevel,
-        remote: fullLower.includes('remote'),
-        tags: ['startup', 'y-combinator', detectedLevel.toLowerCase()],
-        descriptionSnippet: rawText.slice(0, 180) + '...'
+        title: parts[1] || 'Software / AI Engineer',
+        company: parts[0] || 'Tech Startup (YC)',
+        location: parts[2] || 'Remote / Hybrid',
+        url: `https://news.ycombinator.com/item?id=${c.id}`,
+        datePosted: c.time ? new Date(c.time * 1000).toISOString() : new Date().toISOString(),
+        remote: (parts[2] || '').toLowerCase().includes('remote') || rawText.toLowerCase().includes('remote'),
+        tags: ['y-combinator', 'who-is-hiring', 'tech'],
+        descriptionSnippet: rawText.slice(0, 260)
       });
-    }
 
+      if (experienceLevel === 'internship' && job.experienceLevel !== 'Internship') continue;
+      if (experienceLevel === 'entry' && !['Entry Level / Junior', 'Internship'].includes(job.experienceLevel)) continue;
+      if (experienceLevel === 'senior' && job.experienceLevel !== 'Senior') continue;
+      jobs.push(job);
+    }
     return jobs;
   } catch (err) {
-    console.error('HackerNews hiring error:', err.message);
     return [];
   }
 }

@@ -1,67 +1,38 @@
-const axios = require('axios');
+const { BaseScraper } = require('./baseScraper');
+const scraper = new BaseScraper('Y Combinator (YC)');
 
-/**
- * Fetches official Y Combinator startup job stories from Hacker News API
- */
-async function searchYCJobs({ keywords = '', experienceLevel = 'all', limit = 15 }) {
+async function searchYCJobs({ keywords = '', experienceLevel = 'all', limit = 15 } = {}) {
   try {
-    const res = await axios.get('https://hacker-news.firebaseio.com/v0/jobstories.json', { timeout: 6000 });
-    const ids = res.data || [];
-    const topIds = ids.slice(0, 25);
-
-    const promises = topIds.map(id =>
-      axios.get(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, { timeout: 5000 })
-           .then(r => r.data)
-           .catch(() => null)
+    const ids = await scraper.fetchJson('https://hacker-news.firebaseio.com/v0/jobstories.json');
+    const items = await Promise.all(
+      (ids || []).slice(0, 20).map(id => scraper.fetchJson(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).catch(() => null))
     );
 
-    const items = await Promise.all(promises);
     const jobs = [];
     const kwLower = keywords.toLowerCase().trim();
-
     for (const item of items) {
-      if (!item || !item.title) continue;
-      if (jobs.length >= limit) break;
-
+      if (!item?.title || jobs.length >= limit) continue;
       const title = item.title;
-      const lowerTitle = title.toLowerCase();
+      if (kwLower && !title.toLowerCase().includes(kwLower)) continue;
 
-      if (kwLower && !lowerTitle.includes(kwLower)) {
-        continue;
-      }
-
-      let detectedLevel = 'Entry / Mid';
-      const isIntern = lowerTitle.includes('intern');
-      const isJunior = lowerTitle.includes('junior') || lowerTitle.includes('entry');
-      const isSenior = lowerTitle.includes('senior') || lowerTitle.includes('lead');
-
-      if (isIntern) detectedLevel = 'Internship';
-      else if (isJunior) detectedLevel = 'Entry Level / Junior';
-      else if (isSenior) detectedLevel = 'Senior';
-
-      if (experienceLevel === 'internship' && !isIntern) continue;
-      if (experienceLevel === 'entry' && !isJunior && !isIntern) continue;
-
-      const dateStr = item.time ? new Date(item.time * 1000).toISOString().split('T')[0] : 'Recently';
-
-      jobs.push({
+      const job = scraper.normalize({
         id: `yc-${item.id}`,
         title,
         company: 'Y Combinator Startup',
-        location: lowerTitle.includes('remote') ? 'Remote (Worldwide)' : 'US / Remote',
+        location: title.toLowerCase().includes('remote') ? 'Remote (Worldwide)' : 'US / Remote',
         url: item.url || `https://news.ycombinator.com/item?id=${item.id}`,
-        datePosted: dateStr,
-        logo: '',
-        source: 'Y Combinator (YC)',
-        experienceLevel: detectedLevel,
-        remote: lowerTitle.includes('remote'),
-        tags: ['y-combinator', 'startup', detectedLevel.toLowerCase()]
+        datePosted: item.time ? new Date(item.time * 1000).toISOString() : new Date().toISOString(),
+        remote: title.toLowerCase().includes('remote'),
+        tags: ['y-combinator', 'startup']
       });
-    }
 
+      if (experienceLevel === 'internship' && job.experienceLevel !== 'Internship') continue;
+      if (experienceLevel === 'entry' && !['Entry Level / Junior', 'Internship'].includes(job.experienceLevel)) continue;
+      if (experienceLevel === 'senior' && job.experienceLevel !== 'Senior') continue;
+      jobs.push(job);
+    }
     return jobs;
   } catch (err) {
-    console.error('YC Job Stories error:', err.message);
     return [];
   }
 }

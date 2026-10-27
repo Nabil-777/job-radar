@@ -1,66 +1,42 @@
-const axios = require('axios');
+const { BaseScraper } = require('./baseScraper');
+const scraper = new BaseScraper('Jobicy');
 
-/**
- * Searches Jobicy API for remote tech jobs
- */
-async function searchJobicy({ keywords = '', experienceLevel = 'all', limit = 25 }) {
+async function searchJobicy({ keywords = '', experienceLevel = 'all', limit = 25 } = {}) {
   try {
-    const res = await axios.get('https://jobicy.com/api/v2/remote-jobs?count=50', { timeout: 8000 });
-    const rawJobs = res.data?.jobs || [];
+    const data = await scraper.fetchJson('https://jobicy.com/api/v2/remote-jobs?count=50');
+    const items = data?.jobs || [];
     const jobs = [];
     const kwLower = keywords.toLowerCase().trim();
 
-    for (const item of rawJobs) {
+    for (const item of items) {
       if (jobs.length >= limit) break;
       if (!item.jobTitle) continue;
-
       const title = item.jobTitle;
-      const lowerTitle = title.toLowerCase();
-      const ind = Array.isArray(item.jobIndustries) ? item.jobIndustries.join(' ') : (item.jobIndustries || '');
-      const geo = Array.isArray(item.jobGeo) ? item.jobGeo.join(' ') : (item.jobGeo || '');
-      const tags = `${ind} ${geo}`.toLowerCase();
-      const lowerDesc = (item.jobExcerpt || '').toLowerCase();
+      const tags = `${Array.isArray(item.jobIndustries) ? item.jobIndustries.join(' ') : (item.jobIndustries || '')} ${Array.isArray(item.jobGeo) ? item.jobGeo.join(' ') : (item.jobGeo || '')}`.toLowerCase();
+      if (kwLower && !title.toLowerCase().includes(kwLower) && !tags.includes(kwLower)) continue;
 
-      if (kwLower) {
-        const matches = lowerTitle.includes(kwLower) ||
-                        tags.includes(kwLower) ||
-                        (item.companyName && item.companyName.toLowerCase().includes(kwLower));
-        if (!matches) continue;
-      }
-
-      let detectedLevel = 'Entry / Mid';
-      const isIntern = lowerTitle.includes('intern') || (item.jobLevel || '').toLowerCase().includes('intern') || lowerDesc.includes('internship');
-      const isJunior = lowerTitle.includes('junior') || lowerTitle.includes('entry') || (item.jobLevel || '').toLowerCase().includes('entry');
-      const isSenior = lowerTitle.includes('senior') || lowerTitle.includes('lead') || (item.jobLevel || '').toLowerCase().includes('senior');
-
-      if (isIntern) detectedLevel = 'Internship';
-      else if (isJunior) detectedLevel = 'Entry Level / Junior';
-      else if (isSenior) detectedLevel = 'Senior';
-
-      if (experienceLevel === 'internship' && !isIntern) continue;
-      if (experienceLevel === 'entry' && !isJunior && !isIntern) continue;
-      if (experienceLevel === 'senior' && !isSenior) continue;
-
-      jobs.push({
+      const salary = item.annualSalaryMin ? `$${item.annualSalaryMin.toLocaleString()} - $${item.annualSalaryMax?.toLocaleString()} ${item.salaryCurrency || ''}` : '';
+      const job = scraper.normalize({
         id: `jobicy-${item.id}`,
-        title: item.jobTitle,
-        company: item.companyName || 'Unknown',
+        title,
+        company: item.companyName || 'Tech Company',
         location: item.jobGeo || 'Remote (Worldwide)',
         url: item.url,
-        datePosted: item.pubDate ? item.pubDate.split(' ')[0] : 'Recently',
+        datePosted: item.pubDate,
         logo: item.companyLogo || '',
-        source: 'Jobicy',
-        experienceLevel: detectedLevel,
         remote: true,
-        tags: [item.jobType || 'Remote', detectedLevel.toLowerCase()],
-        salary: item.annualSalaryMin ? `$${item.annualSalaryMin.toLocaleString()} - $${item.annualSalaryMax?.toLocaleString()} ${item.salaryCurrency || ''}` : '',
-        descriptionSnippet: item.jobExcerpt ? item.jobExcerpt.replace(/<[^>]*>?/gm, '').slice(0, 180) + '...' : ''
+        tags: [item.jobType || 'Remote'],
+        salary,
+        descriptionSnippet: item.jobExcerpt || ''
       });
-    }
 
+      if (experienceLevel === 'internship' && job.experienceLevel !== 'Internship') continue;
+      if (experienceLevel === 'entry' && !['Entry Level / Junior', 'Internship'].includes(job.experienceLevel)) continue;
+      if (experienceLevel === 'senior' && job.experienceLevel !== 'Senior') continue;
+      jobs.push(job);
+    }
     return jobs;
   } catch (err) {
-    console.error('Jobicy API error:', err.message);
     return [];
   }
 }

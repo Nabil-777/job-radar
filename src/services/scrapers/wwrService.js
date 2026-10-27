@@ -1,91 +1,44 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
+const { BaseScraper } = require('./baseScraper');
+const scraper = new BaseScraper('WeWorkRemotely');
+const FEEDS = [
+  'https://weworkremotely.com/categories/remote-programming-jobs.rss',
+  'https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss'
+];
 
-/**
- * Searches WeWorkRemotely RSS feeds for programming and DevOps jobs
- */
-async function searchWeWorkRemotely({ keywords = '', experienceLevel = 'all', limit = 20 }) {
-  const feeds = [
-    'https://weworkremotely.com/categories/remote-programming-jobs.rss',
-    'https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss'
-  ];
-
+async function searchWeWorkRemotely({ keywords = '', experienceLevel = 'all', limit = 20 } = {}) {
   const jobs = [];
   const kwLower = keywords.toLowerCase().trim();
 
-  for (const feedUrl of feeds) {
+  for (const feedUrl of FEEDS) {
     if (jobs.length >= limit) break;
     try {
-      const res = await axios.get(feedUrl, { timeout: 7000 });
-      const $ = cheerio.load(res.data, { xmlMode: true });
+      const res = await scraper.fetchWithRetry(feedUrl, { responseType: 'text' });
+      const $ = scraper.parseHtml(res.data);
 
-      $('item').each((i, el) => {
+      $('item').each((_, el) => {
         if (jobs.length >= limit) return false;
         const item = $(el);
-
-        const rawTitle = item.find('title').text().trim(); // typically "Company: Title"
-        let company = 'Unknown Company';
-        let title = rawTitle;
-
-        if (rawTitle.includes(':')) {
-          const parts = rawTitle.split(':');
-          company = parts[0].trim();
-          title = parts.slice(1).join(':').trim();
-        }
-
+        const rawTitle = item.find('title').text().trim();
+        const parts = rawTitle.includes(':') ? rawTitle.split(':') : [null, rawTitle];
+        const company = parts[0] ? parts[0].trim() : 'Remote Tech';
+        const title = (parts[1] || rawTitle).trim();
         const link = item.find('link').text().trim();
-        const pubDate = item.find('pubDate').text().trim();
-        const description = item.find('description').text().trim();
-        const lowerTitle = title.toLowerCase();
-        const lowerDesc = description.toLowerCase();
+        const desc = item.find('description').text().trim();
+        if (kwLower && !`${title} ${company} ${desc}`.toLowerCase().includes(kwLower)) return;
 
-        if (kwLower) {
-          const matches = lowerTitle.includes(kwLower) ||
-                          company.toLowerCase().includes(kwLower) ||
-                          lowerDesc.includes(kwLower);
-          if (!matches) return;
-        }
-
-        let detectedLevel = 'Entry / Mid';
-        const isIntern = lowerTitle.includes('intern') || lowerDesc.includes('internship');
-        const isJunior = lowerTitle.includes('junior') || lowerTitle.includes('entry') || lowerDesc.includes('entry level');
-        const isSenior = lowerTitle.includes('senior') || lowerTitle.includes('lead') || lowerTitle.includes('principal');
-
-        if (isIntern) detectedLevel = 'Internship';
-        else if (isJunior) detectedLevel = 'Entry Level / Junior';
-        else if (isSenior) detectedLevel = 'Senior';
-
-        if (experienceLevel === 'internship' && !isIntern) return;
-        if (experienceLevel === 'entry' && !isJunior && !isIntern) return;
-        if (experienceLevel === 'senior' && !isSenior) return;
-
-        let datePosted = 'Recently';
-        if (pubDate) {
-          try {
-            datePosted = new Date(pubDate).toISOString().split('T')[0];
-          } catch(e) {}
-        }
-
-        jobs.push({
-          id: `wwr-${Buffer.from(link).toString('hex').slice(0, 10)}`,
-          title,
-          company,
-          location: 'Remote (Worldwide)',
-          url: link,
-          datePosted,
-          logo: '',
-          source: 'WeWorkRemotely',
-          experienceLevel: detectedLevel,
-          remote: true,
-          tags: ['remote', 'wwr', detectedLevel.toLowerCase()],
-          descriptionSnippet: description.replace(/<[^>]*>?/gm, '').slice(0, 180) + '...'
+        const job = scraper.normalize({
+          title, company, location: 'Remote (Worldwide)',
+          url: link, datePosted: item.find('pubDate').text().trim(),
+          remote: true, tags: ['remote', 'wwr'], descriptionSnippet: desc
         });
-      });
-    } catch (err) {
-      console.error('WeWorkRemotely fetch error:', err.message);
-    }
-  }
 
+        if (experienceLevel === 'internship' && job.experienceLevel !== 'Internship') return;
+        if (experienceLevel === 'entry' && !['Entry Level / Junior', 'Internship'].includes(job.experienceLevel)) return;
+        if (experienceLevel === 'senior' && job.experienceLevel !== 'Senior') return;
+        jobs.push(job);
+      });
+    } catch (err) {}
+  }
   return jobs;
 }
 

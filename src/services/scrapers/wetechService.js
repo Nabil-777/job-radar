@@ -1,21 +1,9 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
+const { BaseScraper } = require('./baseScraper');
+const scraper = new BaseScraper('WeTech Maroc');
 
-/**
- * Scrapes WeTech.ma (100% IT, Informatique, Dev & Cloud au Maroc)
- */
-async function searchWeTech({ keywords = '', experienceLevel = 'all', limit = 15 }) {
+async function searchWeTech({ keywords = '', experienceLevel = 'all', limit = 15 } = {}) {
   try {
-    const url = 'https://www.wetech.ma/offres-emploi/';
-    const res = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8'
-      },
-      timeout: 8000
-    });
-
-    const $ = cheerio.load(res.data);
+    const $ = await scraper.fetchHtml('https://www.wetech.ma/offres-emploi/');
     const jobs = [];
     const kwLower = keywords.toLowerCase().trim();
 
@@ -23,64 +11,32 @@ async function searchWeTech({ keywords = '', experienceLevel = 'all', limit = 15
       if (jobs.length >= limit) return false;
       const link = $(el).attr('href');
       const title = $(el).text().replace(/\s+/g, ' ').trim();
+      if (!title || title.length < 4 || title.toLowerCase().includes('voir plus')) return;
+      if (kwLower && kwLower !== 'software engineer' && !title.toLowerCase().includes(kwLower)) return;
 
-      if (title && title.length > 3 && !title.toLowerCase().includes('voir plus') && !title.toLowerCase().includes('postuler')) {
-        const fullUrl = link.startsWith('http') ? link : `https://www.wetech.ma${link}`;
-        const lowerTitle = title.toLowerCase();
+      const slugMatch = (link || '').match(/\/offre-emploi\/([a-z0-9]+)-/i);
+      const company = (slugMatch && slugMatch[1].length > 2)
+        ? slugMatch[1].charAt(0).toUpperCase() + slugMatch[1].slice(1)
+        : 'Entreprise Tech Maroc';
 
-        // Only filter if user specified custom keywords
-        if (kwLower && kwLower !== 'software engineer' && !lowerTitle.includes(kwLower)) {
-          return;
-        }
+      const job = scraper.normalize({
+        id: `wetech-${Buffer.from(link).toString('hex').slice(0, 10)}`,
+        title,
+        company,
+        location: 'Maroc',
+        url: link.startsWith('http') ? link : `https://www.wetech.ma${link}`,
+        remote: false,
+        tags: ['wetech', 'maroc', 'tech']
+      });
 
-        let detectedLevel = 'Entry / Mid';
-        const isIntern = lowerTitle.includes('stage') || lowerTitle.includes('pfe') || lowerTitle.includes('intern');
-        const isJunior = lowerTitle.includes('junior') || lowerTitle.includes('débutant');
-        const isSenior = lowerTitle.includes('lead') || lowerTitle.includes('senior') || lowerTitle.includes('expert');
+      if (experienceLevel === 'internship' && job.experienceLevel !== 'Internship') return;
+      if (experienceLevel === 'entry' && !['Entry Level / Junior', 'Internship'].includes(job.experienceLevel)) return;
+      if (experienceLevel === 'senior' && job.experienceLevel !== 'Senior') return;
 
-        if (isIntern) detectedLevel = 'Internship';
-        else if (isJunior) detectedLevel = 'Entry Level / Junior';
-        else if (isSenior) detectedLevel = 'Senior';
-
-        if (experienceLevel === 'internship' && !isIntern) return;
-        if (experienceLevel === 'entry' && !isJunior && !isIntern) return;
-
-        // Try extracting company from url slug e.g. /offre-emploi/giantlink-mlops-engineer-979
-        let company = 'Entreprise Tech Maroc';
-        const slugMatch = link.match(/\/offre-emploi\/([a-z0-9]+)-/i);
-        if (slugMatch) {
-          company = slugMatch[1].charAt(0).toUpperCase() + slugMatch[1].slice(1);
-        }
-
-        jobs.push({
-          id: `wetech-${Buffer.from(fullUrl).toString('hex').slice(0, 10)}`,
-          title,
-          company,
-          location: 'Morocco (Casablanca / Rabat / Remote)',
-          url: fullUrl,
-          datePosted: 'Recently',
-          logo: '',
-          source: 'WeTech.ma (100% IT)',
-          experienceLevel: detectedLevel,
-          remote: lowerTitle.includes('remote') || lowerTitle.includes('télétravail'),
-          tags: ['IT Maroc', 'WeTech', detectedLevel.toLowerCase()]
-        });
-      }
+      jobs.push(job);
     });
-
-    // Deduplicate
-    const unique = [];
-    const seen = new Set();
-    for (const j of jobs) {
-      if (!seen.has(j.url)) {
-        seen.add(j.url);
-        unique.push(j);
-      }
-    }
-
-    return unique;
+    return jobs;
   } catch (err) {
-    console.error('WeTech error:', err.message);
     return [];
   }
 }
