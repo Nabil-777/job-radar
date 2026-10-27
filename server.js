@@ -4,6 +4,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const swaggerUi = require('swagger-ui-express');
+const openapiSpec = require('./src/docs/openapi.json');
 
 // Database initialization & legacy migration
 const { db, DB_PATH } = require('./src/db/database');
@@ -97,6 +99,10 @@ app.use('/api/cover-letter/', aiLimiter);
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Interactive OpenAPI Documentation (P3 Task 13)
+app.get('/api/docs/openapi.json', (req, res) => res.json(openapiSpec));
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec));
 
 // Mount API Routes
 app.use('/api/auth', authRoutes);
