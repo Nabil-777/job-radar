@@ -18,6 +18,47 @@ const { searchArbeitnow } = require('./arbeitnowService');
 const { searchHackerNews } = require('./hackerNewsService');
 const { searchEmploiMa } = require('./emploiMaService');
 const { searchCustomProviders } = require('./customProvidersService');
+const { generateFingerprint } = require('../src/utils/fingerprint');
+const { db } = require('../src/db/database');
+
+// Helper to record provider health metrics into SQLite
+function recordHealth(providerName, status, jobsCount, latencyMs, errorMessage = null) {
+  try {
+    db.prepare(`
+      INSERT INTO provider_health (provider_name, last_run_at, status, jobs_count, latency_ms, error_message)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(provider_name) DO UPDATE SET
+        last_run_at = excluded.last_run_at,
+        status = excluded.status,
+        jobs_count = excluded.jobs_count,
+        latency_ms = excluded.latency_ms,
+        error_message = excluded.error_message
+    `).run(
+      providerName,
+      new Date().toISOString(),
+      status,
+      jobsCount,
+      latencyMs,
+      errorMessage ? String(errorMessage).slice(0, 200) : null
+    );
+  } catch (e) {
+    // non-blocking
+  }
+}
+
+async function wrapProvider(name, fn) {
+  const start = Date.now();
+  try {
+    const jobs = await fn();
+    const duration = Date.now() - start;
+    recordHealth(name, 'ok', (jobs || []).length, duration);
+    return jobs || [];
+  } catch (err) {
+    const duration = Date.now() - start;
+    recordHealth(name, 'failed', 0, duration, err.message);
+    return [];
+  }
+}
 
 // Domain presets with rich keywords for precision matching
 const DOMAIN_PRESETS = {
@@ -74,12 +115,13 @@ async function searchJobs(options = {}) {
     location = 'Worldwide',
     source = 'all',
     workType = 'all',
-    limit = 100
+    limit = 100,
+    forceRefresh = false
   } = options;
 
   const cacheKey = JSON.stringify({ domain, keywords, experienceLevel, location, source, workType, limit });
   const cached = cache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
+  if (!forceRefresh && cached && (Date.now() - cached.timestamp < CACHE_TTL)) {
     return { ...cached.data, fromCache: true };
   }
 
@@ -415,19 +457,35 @@ async function searchJobs(options = {}) {
   const results = await Promise.all(tasks);
   const flattened = results.flat();
 
-  // Deduplicate by URL or normalized Title + Company
-  const seen = new Set();
-  const uniqueJobs = [];
+  // Smart cross-board fingerprinting & source merging
+  const fingerprintMap = new Map();
 
   for (const job of flattened) {
     if (!job || !job.title) continue;
-    const key = (job.url || '').toLowerCase().replace(/(\?|#).*$/, '') ||
-                `${job.title.toLowerCase()}_${(job.company || '').toLowerCase()}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniqueJobs.push(job);
+    const fp = job.fingerprint || generateFingerprint(job);
+    job.fingerprint = fp;
+
+    if (fingerprintMap.has(fp)) {
+      const existing = fingerprintMap.get(fp);
+      if (!existing.sources) existing.sources = [existing.source];
+      if (job.source && !existing.sources.includes(job.source)) {
+        existing.sources.push(job.source);
+        existing.source = existing.sources.join(', ');
+      }
+      // Preserve richest description and tags
+      if ((job.descriptionSnippet || '').length > (existing.descriptionSnippet || '').length) {
+        existing.descriptionSnippet = job.descriptionSnippet;
+      }
+      if (Array.isArray(job.tags) && job.tags.length > (existing.tags || []).length) {
+        existing.tags = Array.from(new Set([...(existing.tags || []), ...job.tags]));
+      }
+    } else {
+      job.sources = [job.source];
+      fingerprintMap.set(fp, job);
     }
   }
+
+  const uniqueJobs = Array.from(fingerprintMap.values());
 
   // Sort: Internships / Entry first if requested, then by date
   uniqueJobs.sort((a, b) => {

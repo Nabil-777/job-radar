@@ -69,9 +69,16 @@
           <i data-lucide="sparkles" class="w-4 h-4"></i>
           <span class="hidden sm:inline">Application Tips</span>
         </button>
-        <button onclick="openCustomProvidersModal()" class="px-3 py-1.5 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 shadow-sm">
-          <i data-lucide="plus-circle" class="w-4 h-4 text-indigo-400"></i>
-          <span class="hidden sm:inline">Add Feeds & Providers</span>
+        <button onclick="openHealthModal()" id="btn-provider-health" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 flex items-center space-x-1.5 transition-all" title="View live scrapers & latency metrics">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="health-summary-pill">19/19 Live</span>
+        </button>
+        <button onclick="openCustomProvidersModal()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1 text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 shadow-sm" title="Add Custom RSS Feeds or JSON APIs">
+          <i data-lucide="rss" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span class="hidden md:inline">Feeds</span>
+        </button>
+        <button onclick="openSettingsModal()" class="p-1.5 rounded-lg bg-surface-800 text-slate-400 hover:text-white border border-slate-700/60 transition-all" title="Settings & Webhook Alerts">
+          <i data-lucide="settings" class="w-4 h-4"></i>
         </button>
       </nav>
     </div>
@@ -234,6 +241,10 @@
             </span>
           </div>
           <div class="flex items-center space-x-2">
+            <button onclick="triggerSearch(true)" class="px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center space-x-1.5 transition-all" title="Force fresh scrape & rescan">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>Refresh</span>
+            </button>
             <button onclick="exportCurrentJobs()" class="px-3 py-1.5 rounded-lg bg-surface-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 flex items-center space-x-1.5 transition-all">
               <i data-lucide="download" class="w-3.5 h-3.5"></i>
               <span>Export CSV</span>
@@ -749,19 +760,35 @@
         <div>
           <h2 class="text-xl font-bold text-white flex items-center space-x-2">
             <i data-lucide="bookmark-check" class="w-6 h-6 text-emerald-400"></i>
-            <span>My Application Tracker</span>
+            <span>My Application Tracker & Kanban Board</span>
           </h2>
-          <p class="text-sm text-slate-400 mt-1">Track where you applied, interview dates, and personal follow-up notes.</p>
+          <p class="text-sm text-slate-400 mt-1">Track your recruitment pipeline, move jobs across stages, and receive 7-day follow-up alerts.</p>
         </div>
         <div class="flex items-center space-x-2">
-          <a href="/api/export/applications" class="px-4 py-2 rounded-lg bg-surface-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center space-x-2 transition-all">
+          <div class="inline-flex rounded-lg bg-surface-800 p-0.5 border border-slate-700 mr-1">
+            <button id="btn-mode-kanban" onclick="toggleTrackerMode('kanban')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white flex items-center space-x-1">
+              <i data-lucide="kanban" class="w-3.5 h-3.5"></i>
+              <span>Board</span>
+            </button>
+            <button id="btn-mode-list" onclick="toggleTrackerMode('list')" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-800 text-slate-400 hover:text-white flex items-center space-x-1">
+              <i data-lucide="list" class="w-3.5 h-3.5"></i>
+              <span>List</span>
+            </button>
+          </div>
+          <a href="/api/export/applications" class="px-3.5 py-1.5 rounded-lg bg-surface-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 flex items-center space-x-1.5 transition-all">
             <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-400"></i>
-            <span>Download CSV Spreadsheet</span>
+            <span>Download CSV</span>
           </a>
         </div>
       </div>
 
-      <!-- Tracker Filter Tabs -->
+      <!-- Follow-up Alert Banner -->
+      <div id="followup-reminder-banner" class="hidden p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center space-x-3 shadow-md">
+        <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-400 flex-shrink-0"></i>
+        <p id="followup-reminder-text" class="flex-1"></p>
+      </div>
+
+      <!-- Tracker Filter Tabs (for List View) -->
       <div class="flex items-center space-x-2 overflow-x-auto pb-1 scrollbar-thin">
         <button onclick="filterTracker('all')" class="tracker-filter-btn active px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white" data-status="all">
           All (<span id="t-count-all">0</span>)
@@ -783,8 +810,11 @@
         </button>
       </div>
 
-      <!-- Tracked Applications List -->
-      <div id="tracked-list" class="space-y-3">
+      <!-- Kanban Board Container -->
+      <div id="tracker-kanban-board" class="flex items-start space-x-4 overflow-x-auto pb-4 scrollbar-thin"></div>
+
+      <!-- Tracked Applications List (List View) -->
+      <div id="tracked-list" class="space-y-3 hidden">
         <!-- Rendered dynamically -->
       </div>
 
@@ -811,6 +841,27 @@
           <div>
             <h2 class="text-xl font-bold text-white">Your Candidate Profile & Quick Pitch</h2>
             <p class="text-xs text-slate-400">This information automatically customizes your 1-click Cold Emails & Cover Letters.</p>
+          </div>
+        </div>
+
+        <!-- CV PDF Upload & Auto-fill -->
+        <div class="mb-6 p-4 rounded-xl bg-surface-800/60 border border-brand-500/30 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="file-text" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h4 class="text-xs font-bold text-white">Auto-fill Profile with your CV (PDF)</h4>
+              <p class="text-[11px] text-slate-400">Upload your resume to automatically extract your skills, title, and calculate 0-100% job match scores.</p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-3 w-full sm:w-auto">
+            <label class="cursor-pointer px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-2 transition-all shadow-md shadow-brand-500/20 whitespace-nowrap">
+              <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+              <span>Upload PDF CV</span>
+              <input type="file" id="cv-upload-input" accept=".pdf" class="hidden" onchange="handleCvUpload(event)">
+            </label>
+            <div id="cv-upload-status" class="text-xs"></div>
           </div>
         </div>
 
@@ -924,18 +975,18 @@
     </div>
   </main>
 
-  <!-- ==================== COLD EMAIL / COVER LETTER MODAL ==================== -->
-  <div id="email-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+  <!-- ==================== MULTI-TAB AI PITCH MODAL ==================== -->
+  <div id="modal-email" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-surface-900 border border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
       <!-- Modal Header -->
       <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-surface-950/60">
         <div class="flex items-center space-x-3">
           <div class="w-9 h-9 rounded-lg bg-brand-600/20 text-brand-400 flex items-center justify-center">
-            <i data-lucide="mail" class="w-5 h-5"></i>
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
           </div>
           <div>
-            <h3 class="font-bold text-white text-base">Tailored Cold Email & Cover Letter</h3>
-            <p id="modal-subtitle" class="text-xs text-slate-400">Position at Company</p>
+            <h3 class="font-bold text-white text-base">AI Career Pitch & Application Suite</h3>
+            <p id="modal-job-title" class="text-xs text-slate-400 font-medium">Position @ Company</p>
           </div>
         </div>
         <button onclick="closeEmailModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
@@ -943,28 +994,42 @@
         </button>
       </div>
 
+      <!-- Modal Tabs Bar -->
+      <div class="px-5 pt-3 pb-2 border-b border-slate-800 bg-surface-950/40 flex items-center space-x-2 overflow-x-auto scrollbar-thin">
+        <button id="tab-pitch-letter" onclick="setPitchTab('letter')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 text-white">Cover Letter</button>
+        <button id="tab-pitch-linkedin" onclick="setPitchTab('linkedin')" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-surface-800">LinkedIn Note (&lt;300 chars)</button>
+        <button id="tab-pitch-cold" onclick="setPitchTab('cold')" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-surface-800">Cold Email</button>
+        <button id="tab-pitch-tips" onclick="setPitchTab('tips')" class="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-surface-800">CV Tips (3 Points)</button>
+      </div>
+
       <!-- Modal Body -->
       <div class="p-5 space-y-4 overflow-y-auto flex-1">
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-slate-400">Choose Language:</span>
-          <div class="inline-flex rounded-lg bg-surface-800 p-0.5 border border-slate-700">
-            <button onclick="regenerateModalEmail('English')" id="btn-lang-en" class="px-3 py-1 rounded text-xs font-semibold bg-brand-600 text-white">English</button>
-            <button onclick="regenerateModalEmail('French')" id="btn-lang-fr" class="px-3 py-1 rounded text-xs font-medium text-slate-400 hover:text-white">Français</button>
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+          <div class="flex items-center space-x-2">
+            <span class="text-slate-400">Language:</span>
+            <select id="modal-pitch-lang" onchange="generatePitchContent()" class="bg-surface-800 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-brand-500">
+              <option value="English">English</option>
+              <option value="French">Français</option>
+            </select>
+          </div>
+          <div class="flex items-center space-x-2 w-full sm:w-auto">
+            <input type="text" id="modal-custom-notes" placeholder="Custom note: e.g. highlight my Docker project..." class="w-full sm:w-64 px-2.5 py-1 bg-surface-800 border border-slate-700 rounded text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500">
+            <button onclick="generatePitchContent()" class="px-2.5 py-1 bg-brand-600 hover:bg-brand-500 text-white rounded text-xs font-medium whitespace-nowrap">Regenerate</button>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-slate-400 mb-1">Subject Line</label>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Subject / Header</label>
           <div class="relative">
-            <input type="text" id="modal-subject" readonly class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200">
+            <input type="text" id="modal-subject" readonly class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 pr-16">
             <button onclick="copyToClipboard('modal-subject', this)" class="absolute right-2 top-2 text-xs px-2 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-300">Copy</button>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-slate-400 mb-1">Message Body</label>
+          <label class="block text-xs font-medium text-slate-400 mb-1">Pitch Content</label>
           <div class="relative">
-            <textarea id="modal-body" rows="12" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono text-xs leading-relaxed focus:outline-none focus:border-brand-500"></textarea>
+            <textarea id="modal-body" rows="11" class="w-full px-3 py-2 bg-surface-800 border border-slate-700 rounded-lg text-sm text-slate-200 font-mono text-xs leading-relaxed focus:outline-none focus:border-brand-500"></textarea>
           </div>
         </div>
       </div>
@@ -973,9 +1038,9 @@
       <div class="p-4 border-t border-slate-800 bg-surface-950/60 flex items-center justify-between">
         <button onclick="closeEmailModal()" class="px-4 py-2 text-xs text-slate-400 hover:text-white">Cancel</button>
         <div class="flex items-center space-x-2">
-          <button onclick="copyToClipboard('modal-body', this)" class="px-4 py-2 bg-surface-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 flex items-center space-x-1.5 transition-all">
+          <button id="btn-copy-pitch" onclick="copyPitchText()" class="px-4 py-2 bg-surface-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 flex items-center space-x-1.5 transition-all">
             <i data-lucide="copy" class="w-4 h-4"></i>
-            <span>Copy Full Pitch</span>
+            <span>Copy Pitch</span>
           </button>
           <button onclick="openMailtoClient()" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition-all shadow-md shadow-brand-500/20">
             <i data-lucide="external-link" class="w-4 h-4"></i>
@@ -1075,6 +1140,94 @@
       <!-- Modal Footer -->
       <div class="p-4 border-t border-slate-800 bg-surface-950/60 flex items-center justify-end">
         <button onclick="closeCustomProvidersModal()" class="px-4 py-2 bg-surface-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: PROVIDER HEALTH & OBSERVABILITY ==================== -->
+  <div id="modal-health" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-900 border border-slate-700 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-surface-950/60">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+            <i data-lucide="activity" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">Scraper Health & Observability Matrix</h3>
+            <p class="text-xs text-slate-400">Live latency, error tracking, and extracted job counts per portal</p>
+          </div>
+        </div>
+        <button onclick="closeHealthModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 overflow-y-auto flex-1">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-800 text-slate-400 text-xs font-semibold uppercase">
+              <th class="py-2">Provider</th>
+              <th class="py-2">Status</th>
+              <th class="py-2">Jobs Cached</th>
+              <th class="py-2">Latency</th>
+              <th class="py-2">Last Error</th>
+            </tr>
+          </thead>
+          <tbody id="health-table-body" class="divide-y divide-slate-800/60">
+            <!-- Dynamically populated -->
+          </tbody>
+        </table>
+      </div>
+      <div class="p-4 border-t border-slate-800 bg-surface-950/60 flex items-center justify-end">
+        <button onclick="closeHealthModal()" class="px-4 py-2 bg-surface-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: SETTINGS & WEBHOOK ALERTS ==================== -->
+  <div id="modal-settings" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-surface-900 border border-slate-700 w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-surface-950/60">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="settings" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base">System Settings & Alert Webhooks</h3>
+            <p class="text-xs text-slate-400">Configure AI generation models & instant notification channels</p>
+          </div>
+        </div>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-4 overflow-y-auto flex-1">
+        <div class="p-3.5 rounded-xl bg-surface-800/60 border border-slate-800 space-y-1">
+          <h4 class="text-xs font-bold text-white flex items-center space-x-1.5">
+            <i data-lucide="bell" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>Background Radar Alerts</span>
+          </h4>
+          <p class="text-[11px] text-slate-400">JobRadar runs background radar scans every 30 minutes. High match jobs (&gt;=80%) and PFE stages trigger instant alerts to your configured webhooks.</p>
+        </div>
+
+        <div class="space-y-3">
+          <div class="p-3 rounded-lg bg-surface-800/50 border border-slate-800">
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Telegram Notifications</label>
+            <p class="text-[11px] text-slate-400">Set <code class="text-indigo-300 font-mono">TELEGRAM_BOT_TOKEN</code> &amp; <code class="text-indigo-300 font-mono">TELEGRAM_CHAT_ID</code> in your <code class="text-indigo-300 font-mono">.env</code> file.</p>
+          </div>
+
+          <div class="p-3 rounded-lg bg-surface-800/50 border border-slate-800">
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Discord Webhook</label>
+            <p class="text-[11px] text-slate-400">Set <code class="text-indigo-300 font-mono">DISCORD_WEBHOOK_URL</code> in your <code class="text-indigo-300 font-mono">.env</code> file.</p>
+          </div>
+
+          <div class="p-3 rounded-lg bg-surface-800/50 border border-slate-800">
+            <label class="block text-xs font-semibold text-slate-300 mb-1">AI Provider Priority</label>
+            <p class="text-[11px] text-slate-400">JobRadar automatically uses Gemini &gt; Groq &gt; OpenAI &gt; Ollama &gt; Deterministic Engine depending on available environment variables.</p>
+          </div>
+        </div>
+      </div>
+      <div class="p-4 border-t border-slate-800 bg-surface-950/60 flex items-center justify-end">
+        <button onclick="closeSettingsModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold">Done</button>
       </div>
     </div>
   </div>

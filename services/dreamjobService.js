@@ -1,5 +1,7 @@
-const axios = require('axios');
 const cheerio = require('cheerio');
+const { httpClient } = require('../src/utils/httpClient');
+const { normalizeDate } = require('../src/utils/dateNormalizer');
+const { generateFingerprint } = require('../src/utils/fingerprint');
 
 /**
  * Scrapes Dreamjob.ma (Moroccan IT jobs, Enterprise stages, Concours OCP, ONCF, etc.)
@@ -14,13 +16,7 @@ async function searchDreamjob({ keywords = '', experienceLevel = 'all', limit = 
     }
 
     const url = `https://www.dreamjob.ma/?s=${encodeURIComponent(kw)}`;
-    const res = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8'
-      },
-      timeout: 8000
-    });
+    const res = await httpClient.get(url);
 
     const $ = cheerio.load(res.data);
     const jobs = [];
@@ -55,21 +51,27 @@ async function searchDreamjob({ keywords = '', experienceLevel = 'all', limit = 
       // Extract company name if in title e.g. "SEWS ouvre des stages..." or "Concours LPEE"
       let company = 'Recrutement Maroc (Secteur Privé / Public)';
       const words = title.split(' ');
-      if (words.length > 0) company = words[0];
+      if (words.length > 0 && words[0].length > 2) company = words[0];
 
-      jobs.push({
+      const dateText = $(el).find('time, .date, .entry-date').text().trim();
+
+      const jobItem = {
         id: `dreamjob-${Buffer.from(link).toString('hex').slice(0, 10)}`,
         title,
         company,
         location: 'Morocco (National)',
         url: link,
-        datePosted: 'Recently',
+        datePosted: normalizeDate(dateText),
         logo: '',
         source: 'Dreamjob.ma',
         experienceLevel: detectedLevel,
+        contractType: isIntern ? 'Stage / PFE' : 'Concours / CDI',
         remote: false,
-        tags: ['Dreamjob', 'Maroc', detectedLevel.toLowerCase()]
-      });
+        tags: ['Dreamjob', 'Maroc', isIntern ? 'stage' : 'concours']
+      };
+
+      jobItem.fingerprint = generateFingerprint(jobItem);
+      jobs.push(jobItem);
     });
 
     // Deduplicate
@@ -84,7 +86,7 @@ async function searchDreamjob({ keywords = '', experienceLevel = 'all', limit = 
 
     return unique;
   } catch (err) {
-    console.error('Dreamjob error:', err.message);
+    console.error('[Dreamjob] Scraper error:', err.message);
     return [];
   }
 }

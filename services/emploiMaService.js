@@ -1,5 +1,7 @@
-const axios = require('axios');
 const cheerio = require('cheerio');
+const { httpClient } = require('../src/utils/httpClient');
+const { normalizeDate } = require('../src/utils/dateNormalizer');
+const { generateFingerprint } = require('../src/utils/fingerprint');
 
 /**
  * Scrapes Emploi.ma (IT / Informatique section in Morocco)
@@ -13,14 +15,7 @@ async function searchEmploiMa({ keywords = '', experienceLevel = 'all', limit = 
       url += `&keywords=${encodeURIComponent(kw)}`;
     }
 
-    const res = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-        'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8'
-      },
-      timeout: 10000
-    });
-
+    const res = await httpClient.get(url);
     const $ = cheerio.load(res.data);
     const jobs = [];
     const kwLower = kw.toLowerCase();
@@ -36,6 +31,7 @@ async function searchEmploiMa({ keywords = '', experienceLevel = 'all', limit = 
       const fullUrl = href.startsWith('http') ? href : `https://www.emploi.ma${href}`;
       const company = $(el).find('.card-job-company, .company-title, a[href*="/recruteur/"]').first().text().trim() || 'Entreprise IT au Maroc';
       const desc = $(el).find('.card-job-description').text().trim();
+      const dateText = $(el).find('.card-job-date, time, .posted-date').text().trim();
 
       const lowerTitle = title.toLowerCase();
       const lowerComp = company.toLowerCase();
@@ -62,25 +58,29 @@ async function searchEmploiMa({ keywords = '', experienceLevel = 'all', limit = 
       if (experienceLevel === 'internship' && !isIntern) return;
       if (experienceLevel === 'entry' && !isJunior && !isIntern) return;
 
-      jobs.push({
+      const jobItem = {
         id: `emploi-${Buffer.from(fullUrl).toString('hex').slice(0, 10)}`,
         title,
         company,
         location: 'Morocco (Casablanca, Rabat, Tanger...)',
         url: fullUrl,
-        datePosted: 'Recently',
+        datePosted: normalizeDate(dateText),
         logo: '',
         source: 'Emploi.ma',
         experienceLevel: detectedLevel,
+        contractType: isIntern ? 'Stage / PFE' : (lowerTitle.includes('anapec') ? 'Anapec' : 'CDI'),
         remote: lowerTitle.includes('remote') || lowerTitle.includes('télétravail'),
-        descriptionSnippet: desc.slice(0, 160),
+        descriptionSnippet: desc.slice(0, 180),
         tags: ['Emploi.ma', 'Morocco', detectedLevel.toLowerCase()]
-      });
+      };
+
+      jobItem.fingerprint = generateFingerprint(jobItem);
+      jobs.push(jobItem);
     });
 
     return jobs;
   } catch (err) {
-    console.error('Emploi.ma error:', err.message);
+    console.error('[Emploi.ma] Scraper error:', err.message);
     return [];
   }
 }

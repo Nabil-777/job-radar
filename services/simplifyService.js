@@ -1,5 +1,6 @@
-const axios = require('axios');
 const cheerio = require('cheerio');
+const { httpClient } = require('../src/utils/httpClient');
+const { generateFingerprint } = require('../src/utils/fingerprint');
 
 // In-memory cache for GitHub lists (cached for 1 hour)
 let cacheData = {
@@ -16,32 +17,37 @@ async function fetchSimplifyData() {
   }
 
   const urls = {
-    internships: 'https://raw.githubusercontent.com/SimplifyJobs/Summer2025-Internships/dev/README.md',
+    internships2026: 'https://raw.githubusercontent.com/SimplifyJobs/Summer2026-Internships/dev/README.md',
+    internships2025: 'https://raw.githubusercontent.com/SimplifyJobs/Summer2025-Internships/dev/README.md',
     newGrad: 'https://raw.githubusercontent.com/SimplifyJobs/New-Grad-Positions/dev/README.md'
   };
 
   try {
-    const [resIntern, resGrad] = await Promise.all([
-      axios.get(urls.internships, { timeout: 15000 }).catch(() => ({ data: '' })),
-      axios.get(urls.newGrad, { timeout: 15000 }).catch(() => ({ data: '' }))
+    const [res2026, res2025, resGrad] = await Promise.all([
+      httpClient.get(urls.internships2026).catch(() => ({ data: '' })),
+      httpClient.get(urls.internships2025).catch(() => ({ data: '' })),
+      httpClient.get(urls.newGrad).catch(() => ({ data: '' }))
     ]);
 
-    const internships = parseTable(resIntern.data, 'Internship');
-    const newGrad = parseTable(resGrad.data, 'Entry Level / Junior');
+    const internships2026 = parseTable(res2026.data, 'Internship', 'Summer 2026');
+    const internships2025 = parseTable(res2025.data, 'Internship', 'Summer 2025');
+    const newGrad = parseTable(resGrad.data, 'Entry Level / Junior', 'New Grad');
+
+    const mergedInternships = [...internships2026, ...internships2025];
 
     cacheData = {
-      internships,
+      internships: mergedInternships,
       newGrad,
       timestamp: now
     };
   } catch (err) {
-    console.error('Error fetching SimplifyJobs data:', err.message);
+    console.error('[SimplifyJobs] Error fetching GitHub index data:', err.message);
   }
 
   return cacheData;
 }
 
-function parseTable(markdown, defaultLevel) {
+function parseTable(markdown, defaultLevel, tagLabel) {
   if (!markdown) return [];
   const $ = cheerio.load(markdown);
   const jobs = [];
@@ -66,19 +72,23 @@ function parseTable(markdown, defaultLevel) {
           detectedLevel = 'Entry Level / Junior';
         }
 
-        jobs.push({
+        const jobItem = {
           id: `simplify-${Buffer.from(company + rawTitle).toString('hex').slice(0, 10)}`,
           title: rawTitle,
           company: company || 'Top Tech Company',
-          location: location || 'Remote / Hybrid',
+          location: location || 'Remote / Global',
           url: applyLink,
           datePosted: age ? `${age} ago` : 'Recently',
           logo: '',
           source: 'GitHub Tech Index',
           experienceLevel: detectedLevel,
+          contractType: detectedLevel === 'Internship' ? 'Stage / PFE' : 'CDI',
           remote: location.toLowerCase().includes('remote'),
-          tags: ['curated', 'direct-ats', detectedLevel.toLowerCase()]
-        });
+          tags: ['curated', 'direct-ats', tagLabel, detectedLevel.toLowerCase()]
+        };
+
+        jobItem.fingerprint = generateFingerprint(jobItem);
+        jobs.push(jobItem);
       }
     }
   });
@@ -122,7 +132,7 @@ async function searchSimplify({ keywords = '', experienceLevel = 'all', location
     }
 
     // Keyword match
-    if (kwLower) {
+    if (kwLower && kwLower !== 'software engineer') {
       const match = titleLower.includes(kwLower) || compLower.includes(kwLower);
       if (!match) continue;
     }

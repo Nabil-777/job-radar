@@ -1,123 +1,148 @@
-# 🎯 JobRadar - Automated Tech Job & Internship Finder
+# 🎯 JobRadar v2.0 — AI-Powered Tech Job & Internship Intelligence Platform
 
-JobRadar huwa ssystem kaml li kiyjm3 lik **Internships (Stage / PFE)**, **Entry-Level (Junior)**, wla **Any Specific Job Level** f domains dyal tech b7al **AI Engineering**, **Cybersecurity**, **Software Development**, **Cloud / DevOps**, w **Data Science**.
+[![Node.js](https://img.shields.io/badge/Node.js-v20%2B-green.svg)](https://nodejs.org/)
+[![Database](https://img.shields.io/badge/SQLite-WAL%20Mode-blue.svg)](https://www.sqlite.org/)
+[![Security](https://img.shields.io/badge/Security-Helmet%20%7C%20Rate%20Limit-orange.svg)](https://helmetjs.github.io/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 
-Kiyjbed les offres f real-time mn **19+ dial les plus grandes plateformes + Système d'Ajout de Providers Personnalisés**:
-1. 🇲🇦 **Jobzyn.com** (Le "Welcome to the Jungle" marocain - Startups, Scale-ups & boîtes Tech modernes)
-2. 🇲🇦 **WeTech.ma** (Site 100% dédié aux métiers de l'informatique & Cloud au Maroc)
-3. 🇲🇦 **Talent.com Maroc (ma.talent.com)** (Moteur d'agrégation d'offres d'emploi & stages IT à travers tout le Maroc)
-4. 🇲🇦 **Dreamjob.ma** (Stages d'entreprises & concours IT du secteur public, semi-public et privé)
-5. 🇲🇦 **Emploi.ma** (Le grand portail d'offres d'emploi et stages techniques au Maroc)
-6. 🇲🇦 **Morocco Top ESN Hub** (Les plus gros recruteurs IT au Maroc : Capgemini, DXC, CGI, Alten, Inetum, SQLI, Atos, Sofrecom, Oracle Labs...)
-7. 🇲🇦 **Rekrute.com** (Leader historique des stages PFE, pré-embauche et postes IT au Maroc)
-8. ⚡ **Custom Providers & RSS Feeds Engine** (Ajoute n'importe quel flux RSS, blog carrières ou API JSON en 1 clic)
-9. 🚀 **GitHub Tech Index / SimplifyJobs** (Plus de 2,400+ stages w jobs Junior chez FAANG & Top Tech: Google, Amazon, Apple, Meta, Adobe, Qualcomm, BCG, EA...)
-10. 🟠 **Indeed** (Live scraper b direct links dial Greenhouse, Lever, Workable, BambooHR, ADP)
-11. 🔵 **LinkedIn Jobs** (Live guest scraper f ga3 les pays - Maroc, Remote, USA, Europe...)
-12. ✈️ **Relocate.me** (Offres tech f l'Europe avec Visa Sponsorship & Relocation pris en charge)
-13. 🦄 **Y Combinator (YC)** (Offres officielles dial les startups accélérées par YC)
-14. 🏔️ **Himalayas** (Top global remote tech job board avec salaires affichés)
-15. 🌐 **Jobicy** (Worldwide remote jobs f dev, AI, cybersecurity)
-16. 💼 **WeWorkRemotely** (WWR - plus grand site d télétravail tech)
-17. 🟧 **Hacker News (Who is Hiring)** (Offres directes des fondateurs w CTOs de startups Silicon Valley)
-18. 🔴 **Remotive** (Worldwide remote developer & security jobs)
-19. 🟡 **RemoteOK** (100% remote tech jobs)
-20. 🟣 **Arbeitnow** (Tech jobs f Europe & Global avec visa sponsorship)
+**JobRadar v2.0** is an enterprise-grade Tech Career Intelligence and Recruitment Automation Platform tailored for Morocco and Global/Remote tech talent. It aggregates tech internships (Stage PFE / Pré-embauche), junior roles, and remote engineering positions across **19+ major job portals and custom RSS/JSON feeds**, scores every listing against candidate CV profiles using a **0–100% AI Matching Engine**, and automates application outreach.
 
 ---
 
-## 🇲🇦 Nouveau Onglet Dédié : "Morocco Tech Hub"
-Daba f l'application f [http://localhost:4000](http://localhost:4000) ghadi tl9a onglet jdid **"🇲🇦 Morocco Tech Hub"** fih :
-1. **Les Portails Directs des ESN / SSII (80% des PFE & Juniors au Maroc) :**
-   * **Capgemini Engineering / TS Maroc** (Casa Nearshore, Rabat, Fès)
-   * **DXC Technology Maroc** (Technopolis Rabat, Casa)
-   * **CGI Maroc** (Rabat, Casa, Fès)
-   * **Alten Maroc** (Rabat, Fès, Tétouan, Casa)
-   * **Inetum & Sofrecom (Orange IT)**
-   * **Oracle Labs Maroc (R&D Elite)**
-   * **SQLI Maroc** (Rabat, Casa, Oujda)
-   * **Atos / Eviden Maroc**
-   * **Sopra Steria Maroc**
-   * *Bouton 1-click pour scanner les offres en direct ou ouvrir le portail carrières officiel.*
-2. **Les Jobboards Tech au Maroc :** WeTech.ma, Jobzyn.com, Rekrute.com, Geeksblabla Community.
-3. **Programmes Bootcamps & Insertion Directe :** JobInTech.academy (100% gratuit, 200+ entreprises partenaires), YouCode & 1337, ARK-X.
-4. **Remote depuis le Maroc (En Devises) :** Welcome to the Jungle (Télétravail total France), Wellfound (Startups), Ureed.com & Bayt (Dubaï & Golfe).
+## 🌟 What's New in v2.0
+
+* **💾 Production SQLite Storage (WAL Mode):** Replaced fragile JSON files with high-concurrency SQLite (`better-sqlite3`). Schema includes `jobs`, `applications`, `user_profile`, `custom_providers`, and `provider_health`.
+* **🤖 0–100% AI Candidate Matching Engine:** Weighted heuristic scoring (50% skill overlap, 25% seniority fit, 25% location/remote preference) with extracted keyword badges (`Matched Skills`, `Missing Skills`).
+* **📄 PDF CV Parser & Auto-Profile Sync:** Upload your resume (PDF) to automatically parse tech stack keywords, education, and target job titles.
+* **✍️ 4-in-1 AI Career Application Suite:** Generates tailored Cover Letters, LinkedIn Recruiter connection notes (<300 chars), cold outreach emails, and 3 specific CV alignment suggestions via Gemini, Groq, OpenAI, Ollama, or deterministic template engine.
+* **📋 Kanban Application Pipeline:** Drag-and-drop / 1-click status updates across 6 stages (`Saved`, `Applied`, `Technical_Test`, `Interview`, `Offer`, `Rejected`) with **7-day follow-up reminder alerts**.
+* **🛡️ Resilient Scraper Architecture:** User-Agent rotation, 8-second request timeouts, cross-board deduplication (`slugify(company)::slugify(title)::slugify(city)`), and merged source badges (`Sources: ReKrute, LinkedIn`).
+* **📈 Observability & Health Matrix:** Live tracking of scraper latency, HTTP status codes, error messages, and cached job counts accessible via UI modal and `/api/providers/health`.
+* **⏰ Autonomous Background Radar Cron:** Automatically sweeps job boards every 30 minutes, flags unseen opportunities (`is_new = 1`), and delivers high-match alerts to Discord & Telegram webhooks.
+* **⚡ Upgraded CLI v2.0:** Includes `--pfe` shortcut, `--match` AI scoring against saved profile, and `--export csv|json`.
+* **🐳 Docker & Docker Compose Ready:** Single-command production deployment with volume persistence.
 
 ---
 
-## ⚡ Quick Start
+## 🌐 19+ Built-In Providers & Custom Feeds
 
-### 1. Run the Web Dashboard
-Khdem biha direct mn browser dyalk:
+| Provider | Focus | Region |
+| :--- | :--- | :--- |
+| **Jobzyn.com** | Startups, Scale-ups & Modern Tech | 🇲🇦 Morocco |
+| **WeTech.ma** | 100% IT, Dev & Cloud Platforms | 🇲🇦 Morocco |
+| **Talent.com (Maroc)** | National Job Search Aggregator | 🇲🇦 Morocco |
+| **Dreamjob.ma** | Stages, PFE & Concours Public/Privé | 🇲🇦 Morocco |
+| **Emploi.ma** | IT, Networks & Technical Support | 🇲🇦 Morocco |
+| **Morocco Top ESN Hub** | Capgemini, DXC, CGI, Alten, Inetum, SQLI, Atos, Sofrecom, Oracle Labs | 🇲🇦 Morocco |
+| **Rekrute.com** | Corporate IT & Banking PFE Hubs | 🇲🇦 Morocco |
+| **Custom Feeds** | User-defined RSS / Atom XML feeds or JSON endpoints | 🌐 Global |
+| **GitHub Tech Index / SimplifyJobs** | 2,400+ FAANG / Top Tech Internships (2026, 2025, New Grad) | 🌐 Global / US |
+| **Indeed** | Greenhouse, Lever, Workable, BambooHR direct employer links | 🌐 Global |
+| **LinkedIn Jobs** | Live Guest scraper for Morocco, Remote, EMEA, Worldwide | 🌐 Global |
+| **Relocate.me** | Tech jobs with verified Visa Sponsorship in Europe | 🇪🇺 Europe |
+| **Y Combinator (YC)** | Top accelerated tech startups (Work at a Startup) | 🌐 Global / Remote |
+| **Himalayas** | Worldwide remote tech positions with visible salaries | 🌐 Global |
+| **Jobicy** | Remote software engineering, AI, DevOps | 🌐 Global |
+| **WeWorkRemotely** | Largest remote developer & tech community | 🌐 Global |
+| **Hacker News (YC)** | Direct founder & CTO hiring posts | 🌐 Global |
+| **Remotive** | Curated remote developer & security jobs | 🌐 Global |
+| **RemoteOK** | 100% remote tech jobs | 🌐 Global |
+| **Arbeitnow** | European tech jobs with English speaking teams | 🇪🇺 Europe |
+
+---
+
+## 🚀 Quick Start
+
+### 1. Local Development
 ```bash
-cd "C:\Users\Admin\.gemini\antigravity\scratch\job-radar"
+# Clone the repository
+git clone https://github.com/Nabil-777/job-radar.git
+cd job-radar
+
+# Install dependencies
+npm install
+
+# Setup environment configuration
+cp .env.example .env
+
+# Run database tests (14 unit tests)
+npm test
+
+# Start the server (Port 4000)
 npm start
 ```
-Ouvri f browser: **[http://localhost:4000](http://localhost:4000)**
+Open **[http://localhost:4000](http://localhost:4000)** in your browser.
 
-### 2. Run from Terminal (CLI)
-Ila bghiti tjbed les offres direct mn command line:
+---
+
+### 2. Docker Deployment
 ```bash
-# 1. Jbed les offres de Jobzyn.com (Startups marocaines)
-node cli.js --source jobzyn --keywords "React"
+# Build and run with Docker Compose
+docker-compose up -d
 
-# 2. Jbed les offres de WeTech.ma (100% IT Maroc)
-node cli.js --source wetech --level all
-
-# 3. Jbed les offres de Talent.com Maroc (ma.talent.com)
-node cli.js --source talent-morocco --keywords "informatique"
-
-# 4. Jbed les stages et concours IT de Dreamjob.ma
-node cli.js --source dreamjob --level internship
-
-# 5. Jbed les offres des plus grandes ESN au Maroc (Capgemini, DXC, CGI, Alten...)
-node cli.js --source esn-morocco --level internship --location Morocco
-
-# 6. Jbed les stages AI dial FAANG / Top Tech (GitHub Index)
-node cli.js --source simplify --level internship --keywords "AI"
-
-# 7. Jbed les offres avec Visa Sponsorship pour l'Europe (Relocate.me)
-node cli.js --source relocate --keywords "Python"
-
-# 8. Ga3 les 18 plateformes en même temps :
-node cli.js --source all --domain dev --level internship --location Morocco
+# View live application logs
+docker-compose logs -f
 ```
 
 ---
 
-## 📁 Project Structure
+## 💻 CLI v2.0 Usage
+
+```bash
+# Search Moroccan PFE Internships with AI Match Scoring against saved profile
+node cli.js --pfe --match
+
+# Search React roles from Jobzyn with JSON export
+node cli.js --source jobzyn --keywords "React" --export json my_jobs.json
+
+# Search Cybersecurity / SOC roles with CSV export
+node cli.js --keywords "Cybersecurity" --match --export csv
+
+# Search ESNs with limit and custom location
+node cli.js --source esn-morocco --level internship --location Morocco --limit 10
+
+# View complete CLI manual
+node cli.js --help
 ```
-job-radar/
-├── server.js                 # Express Server & REST API (port 4000)
-├── cli.js                    # Command-line interface
-├── package.json
-├── services/
-│   ├── jobzynService.js      # Jobzyn.com (Maroc Startups, Scale-ups & Tech)
-│   ├── wetechService.js      # WeTech.ma (100% IT & Cloud au Maroc)
-│   ├── talentMoroccoService.js# Talent.com Morocco (Agrégateur national IT)
-│   ├── dreamjobService.js    # Dreamjob.ma (Stages & Concours IT)
-│   ├── esnMoroccoService.js  # Morocco Top ESNs Hub (Capgemini, DXC, CGI, Alten, Inetum, SQLI...)
-│   ├── rekruteService.js     # Rekrute.com (Morocco IT & Stage PFE)
-│   ├── simplifyService.js    # GitHub Tech Index (2,400+ Internships & New Grad)
-│   ├── indeedService.js      # Indeed live crawler (Direct Greenhouse/Lever links)
-│   ├── linkedinScraper.js    # LinkedIn live guest scraper
-│   ├── relocateService.js    # Relocate.me (Europe Visa Sponsored & Relocation)
-│   ├── ycJobStoriesService.js# Y Combinator official startup job stories
-│   ├── hackerNewsService.js  # Hacker News "Who is Hiring" founder postings
-│   ├── himalayasService.js   # Himalayas API (Global remote tech & salaries)
-│   ├── jobicyService.js      # Jobicy API
-│   ├── wwrService.js         # WeWorkRemotely RSS feeds
-│   ├── remotiveService.js    # Remotive API
-│   ├── remoteokService.js    # RemoteOK API
-│   ├── arbeitnowService.js   # Arbeitnow API
-│   ├── aggregator.js         # Unified engine connecting all 18 providers
-│   ├── storage.js            # Persistent JSON storage for tracked jobs
-│   └── letterGenerator.js    # Cold Email & Cover Letter generator (EN & FR)
-├── data/
-│   ├── applications.json     # Tracked job applications
-│   └── user_profile.json     # User profile details
-└── public/
-    ├── index.html            # Modern dashboard with dedicated Morocco Directory
-    ├── app.js                # Search, filter, tracker, modal & export logic
-    └── styles.css            # Custom badges & theme styling
+
+---
+
+## 📡 REST API Reference
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/health` | Service uptime and SQLite database health |
+| `GET` | `/api/jobs` | Multi-portal search with query filters and match scores |
+| `GET` | `/api/providers/health` | Latency, error rates, and job counts for all 19+ providers |
+| `GET` | `/api/applications` | List tracked applications in recruitment pipeline |
+| `POST` | `/api/applications` | Track a job in the Kanban pipeline |
+| `PATCH` | `/api/applications/:id` | Update stage (`Saved`, `Applied`, `Technical_Test`, etc.) |
+| `DELETE` | `/api/applications/:id` | Remove tracked application |
+| `GET` | `/api/export/applications` | Download applications as a CSV spreadsheet |
+| `GET` | `/api/profile` | Retrieve candidate profile and parsed CV skills |
+| `POST` | `/api/profile` | Update candidate profile |
+| `POST` | `/api/profile/upload-cv` | Upload PDF CV to extract skills and profile fields |
+| `POST` | `/api/ai/pitch` | Generate Cover Letter, LinkedIn Note, Cold Email, CV Tips |
+| `GET` | `/api/custom-providers` | List active custom RSS / JSON providers |
+| `POST` | `/api/custom-providers` | Add a custom RSS or JSON feed |
+| `PATCH` | `/api/custom-providers/:id/toggle` | Enable or disable custom feed |
+| `DELETE` | `/api/custom-providers/:id` | Remove custom provider |
+
+---
+
+## 🧪 Automated Test Suite
+
+JobRadar includes a native Node.js test runner suite (`node:test`):
+```bash
+npm test
 ```
+**Test Coverage:**
+- `tests/fingerprint.test.js`: Cross-board job deduplication & slugification
+- `tests/matchingEngine.test.js`: 0–100% heuristic skill matching & keyword extraction
+- `tests/database.test.js`: SQLite WAL mode CRUD & Kanban status transitions
+- `tests/dateNormalizer.test.js`: Multi-language relative date parsing
+
+---
+
+## 📄 License
+MIT © [Nabil-777](https://github.com/Nabil-777)

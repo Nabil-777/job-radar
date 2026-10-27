@@ -6,3 +6,7 @@ yarn-error.log*
 Thumbs.db
 *.log
 .env
+*.db-journal
+*.db-wal
+*.db-shm
+uploads/

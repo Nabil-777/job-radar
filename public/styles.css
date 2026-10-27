@@ -187,4 +187,38 @@
   border: 1px solid rgba(236, 72, 153, 0.3);
 }
 
+/* Kanban Board Styling */
+.kanban-col {
+  min-width: 280px;
+  max-width: 320px;
+}
+
+.kanban-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.kanban-card:hover {
+  transform: translateY(-2px);
+  border-color: #6366f1;
+}
+
+/* Follow-up Alert Ping */
+.followup-alert {
+  border-left: 3px solid #f59e0b;
+}
+
+/* Match Score Gradients */
+.match-high {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 182, 212, 0.1));
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.match-med {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.1));
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+
 
