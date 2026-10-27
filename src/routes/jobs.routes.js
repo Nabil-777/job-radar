@@ -46,7 +46,7 @@ router.get(['/', '/search'], async (req, res) => {
     // Sort by matchScore descending if level/domain search
     jobsWithScores.sort((a, b) => (b.matchScore || 0) - (a.matchScore || 0));
 
-    // Async persist jobs to SQLite in background
+    // Async persist jobs to SQLite in background inside a transaction
     setImmediate(() => {
       try {
         const insertJob = db.prepare(`
@@ -60,29 +60,33 @@ router.get(['/', '/search'], async (req, res) => {
             match_score = excluded.match_score
         `);
 
-        for (const j of jobsWithScores.slice(0, 30)) {
-          if (!j.fingerprint) continue;
-          insertJob.run(
-            j.id,
-            j.id,
-            j.title,
-            j.company,
-            j.location,
-            j.remote ? 1 : 0,
-            j.category || 'tech',
-            j.experienceLevel || 'Entry',
-            j.contractType || 'CDI',
-            j.salary || '',
-            j.descriptionSnippet || '',
-            JSON.stringify(j.tags || []),
-            j.url,
-            j.source,
-            j.fingerprint,
-            j.datePosted || new Date().toISOString(),
-            new Date().toISOString(),
-            j.matchScore || 70
-          );
-        }
+        const insertJobsBatch = db.transaction((jobs) => {
+          for (const j of jobs) {
+            if (!j.fingerprint) continue;
+            insertJob.run(
+              j.id,
+              j.id,
+              j.title,
+              j.company,
+              j.location,
+              j.remote ? 1 : 0,
+              j.category || 'tech',
+              j.experienceLevel || 'Entry',
+              j.contractType || 'CDI',
+              j.salary || '',
+              j.descriptionSnippet || '',
+              JSON.stringify(j.tags || []),
+              j.url,
+              j.source,
+              j.fingerprint,
+              j.datePosted || new Date().toISOString(),
+              new Date().toISOString(),
+              j.matchScore || 70
+            );
+          }
+        });
+
+        insertJobsBatch(jobsWithScores.slice(0, 30));
       } catch (e) {
         // non-blocking
       }

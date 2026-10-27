@@ -57,25 +57,28 @@ router.post('/signup', async (req, res) => {
     const userId = 'usr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const nowIso = new Date().toISOString();
 
-    // Insert user into SQLite
-    db.prepare(`
-      INSERT INTO users (id, email, password_hash, full_name, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(userId, email, passwordHash, fullName, nowIso, nowIso);
+    // Insert user into SQLite inside a transaction
+    const createUserAndProfile = db.transaction(() => {
+      db.prepare(`
+        INSERT INTO users (id, email, password_hash, full_name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(userId, email, passwordHash, fullName, nowIso, nowIso);
 
-    // Initialize user profile
-    db.prepare(`
-      INSERT OR REPLACE INTO user_profile (id, user_id, full_name, email, location, skills_json, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      userId,
-      userId,
-      fullName,
-      email,
-      'Morocco',
-      JSON.stringify(['JavaScript', 'Python', 'React', 'Node.js', 'SQL', 'Docker']),
-      nowIso
-    );
+      // Initialize user profile
+      db.prepare(`
+        INSERT OR REPLACE INTO user_profile (id, user_id, full_name, email, location, skills_json, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        userId,
+        userId,
+        fullName,
+        email,
+        'Morocco',
+        JSON.stringify(['JavaScript', 'Python', 'React', 'Node.js', 'SQL', 'Docker']),
+        nowIso
+      );
+    });
+    createUserAndProfile();
 
     const userPayload = {
       id: userId,
@@ -176,24 +179,27 @@ router.post('/demo', async (req, res) => {
       const userId = 'usr_demo_account';
       const now = new Date().toISOString();
 
-      db.prepare(`
-        INSERT INTO users (id, email, password_hash, full_name, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(userId, demoEmail, passwordHash, 'Demo Engineer', now, now);
+      const createDemoUserAndProfile = db.transaction(() => {
+        db.prepare(`
+          INSERT INTO users (id, email, password_hash, full_name, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).run(userId, demoEmail, passwordHash, 'Demo Engineer', now, now);
 
-      db.prepare(`
-        INSERT OR REPLACE INTO user_profile (id, user_id, full_name, email, location, title, skills_json, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        userId,
-        userId,
-        'Demo Engineer',
-        demoEmail,
-        'Casablanca, Morocco',
-        'Full-Stack & AI Engineer',
-        JSON.stringify(['React', 'Node.js', 'Python', 'FastAPI', 'Docker', 'PostgreSQL', 'Git']),
-        now
-      );
+        db.prepare(`
+          INSERT OR REPLACE INTO user_profile (id, user_id, full_name, email, location, title, skills_json, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          userId,
+          userId,
+          'Demo Engineer',
+          demoEmail,
+          'Casablanca, Morocco',
+          'Full-Stack & AI Engineer',
+          JSON.stringify(['React', 'Node.js', 'Python', 'FastAPI', 'Docker', 'PostgreSQL', 'Git']),
+          now
+        );
+      });
+      createDemoUserAndProfile();
 
       user = { id: userId, email: demoEmail, full_name: 'Demo Engineer' };
     }

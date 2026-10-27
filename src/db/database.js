@@ -8,10 +8,12 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 const DB_PATH = path.join(DATA_DIR, 'jobradar.db');
-const db = new Database(DB_PATH);
+const db = new Database(DB_PATH, { timeout: 5000 });
 
-// Enable WAL mode for high concurrency and performance
+// Enable WAL mode and 5000ms busy timeout for high concurrency and zero locking
 db.pragma('journal_mode = WAL');
+db.pragma('busy_timeout = 5000');
+db.pragma('synchronous = NORMAL');
 db.pragma('foreign_keys = ON');
 
 function initSchema() {
@@ -141,4 +143,10 @@ function initSchema() {
 
 initSchema();
 
-module.exports = { db, DB_PATH, getDb: () => db };
+module.exports = {
+  db,
+  DB_PATH,
+  getDb: () => db,
+  // Helper to execute work inside a SQLite transaction
+  transaction: (fn) => db.transaction(fn)
+};
