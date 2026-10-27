@@ -1,7 +1,7 @@
 const cheerio = require('cheerio');
-const { db } = require('../src/db/database');
-const { httpClient } = require('../src/utils/httpClient');
-const { generateFingerprint } = require('../src/utils/fingerprint');
+const { db } = require('../db/database');
+const { httpClient } = require('../utils/httpClient');
+const { generateFingerprint } = require('../utils/fingerprint');
 
 // In-memory cache for custom provider results: key -> { data, timestamp }
 const feedCache = new Map();

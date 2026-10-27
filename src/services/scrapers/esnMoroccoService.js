@@ -1,5 +1,5 @@
 const { searchLinkedIn } = require('./linkedinScraper');
-const { generateFingerprint } = require('../src/utils/fingerprint');
+const { generateFingerprint } = require('../../utils/fingerprint');
 
 // The Major Multinational ESNs & Tech Recruiter Hubs in Morocco
 const TOP_MOROCCO_ESNS = [

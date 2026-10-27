@@ -11,7 +11,7 @@ const { runMigration } = require('./src/db/migrateJson');
 runMigration();
 
 // Aggregator & Cron
-const { searchJobs, DOMAIN_PRESETS } = require('./services/aggregator');
+const { searchJobs, DOMAIN_PRESETS } = require('./src/services/aggregator');
 const { startRadarCron } = require('./src/jobs/radarCron');
 
 // Middleware

@@ -3,7 +3,7 @@
  * JobRadar CLI v2.0
  * Instant Multi-Portal Tech Job & Internship Scanner with AI Match Scoring
  */
-const { searchJobs } = require('./services/aggregator');
+const { searchJobs } = require('./src/services/aggregator');
 const { getDb } = require('./src/db/database');
 const { calculateMatchScore } = require('./src/services/matchingEngine');
 const fs = require('fs');

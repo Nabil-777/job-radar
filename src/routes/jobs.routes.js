@@ -1,5 +1,5 @@
 const express = require('express');
-const { searchJobs } = require('../../services/aggregator');
+const { searchJobs } = require('../services/aggregator');
 const { db } = require('../db/database');
 const { calculateMatchScore } = require('../services/matchingEngine');
 

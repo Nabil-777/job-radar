@@ -1,6 +1,6 @@
 const cheerio = require('cheerio');
-const { httpClient } = require('../src/utils/httpClient');
-const { generateFingerprint } = require('../src/utils/fingerprint');
+const { httpClient } = require('../../utils/httpClient');
+const { generateFingerprint } = require('../../utils/fingerprint');
 
 // In-memory cache for GitHub lists (cached for 1 hour)
 let cacheData = {

@@ -1,7 +1,7 @@
 const cheerio = require('cheerio');
-const { httpClient } = require('../src/utils/httpClient');
-const { normalizeDate } = require('../src/utils/dateNormalizer');
-const { generateFingerprint } = require('../src/utils/fingerprint');
+const { httpClient } = require('../../utils/httpClient');
+const { normalizeDate } = require('../../utils/dateNormalizer');
+const { generateFingerprint } = require('../../utils/fingerprint');
 
 /**
  * Scrapes Dreamjob.ma (Moroccan IT jobs, Enterprise stages, Concours OCP, ONCF, etc.)
