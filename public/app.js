@@ -1,12 +1,15 @@
 /**
  * JobRadar v2.0 — Craft Frontend Controller (Linear / Raycast / Read.cv Inspired)
- * High-Density Scannability, Keyboard Navigation (j/k/⌘K), 3-Zone Shell, Inspector Drawer
+ * High-Density Scannability, Keyboard Navigation (j/k/⌘K), 3-Zone Shell, Inspector Drawer,
+ * and Full Authentication (Sign In / Sign Up / Demo Account / Multi-User Scoping)
  */
 
 // Application State
 const state = {
   currentView: 'jobs',           // 'jobs' | 'morocco' | 'tracker' | 'profile' | 'sources'
   feedViewMode: 'list',          // 'list' | 'grid'
+  currentUser: null,             // { id, email, fullName } when logged in
+  authToken: localStorage.getItem('jobradar_token') || null,
   jobs: [],
   filteredJobs: [],
   applications: [],
@@ -19,6 +22,14 @@ const state = {
   pitchDataCache: {},            // Cache generated pitches by jobId
   theme: localStorage.getItem('jobradar_theme') || 'dark'
 };
+
+// Auth Header Helper
+function getAuthHeaders(includeJson = true) {
+  const headers = {};
+  if (includeJson) headers['Content-Type'] = 'application/json';
+  if (state.authToken) headers['Authorization'] = `Bearer ${state.authToken}`;
+  return headers;
+}
 
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', async () => {
@@ -36,6 +47,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Register global keyboard listeners
   setupKeyboardNavigation();
 
+  // Verify auth session
+  await checkAuthSession();
+
   // Initialize Lucide icons
   if (window.lucide) lucide.createIcons();
 
@@ -50,6 +64,231 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initial jobs search
   await triggerSearch();
 });
+
+// ==================== AUTHENTICATION CONTROLLER ====================
+async function checkAuthSession() {
+  if (!state.authToken) {
+    state.currentUser = null;
+    renderAuthWidgets();
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: getAuthHeaders(true)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.user) {
+        state.currentUser = data.user;
+        if (data.profile) state.profile = data.profile;
+      } else {
+        state.authToken = null;
+        localStorage.removeItem('jobradar_token');
+        state.currentUser = null;
+      }
+    } else {
+      state.authToken = null;
+      localStorage.removeItem('jobradar_token');
+      state.currentUser = null;
+    }
+  } catch (e) {
+    console.error('Auth verification error:', e);
+  }
+
+  renderAuthWidgets();
+}
+
+function renderAuthWidgets() {
+  const railSection = document.getElementById('rail-auth-section');
+  const cmdSlot = document.getElementById('cmd-user-slot');
+
+  if (state.currentUser) {
+    const name = state.currentUser.fullName || state.currentUser.email.split('@')[0];
+    const initials = name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+    if (railSection) {
+      railSection.innerHTML = `
+        <div style="padding: 10px 12px; border-radius: var(--radius-sm); background: var(--bg-canvas); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+            <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-gradient); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: #fff; flex-shrink: 0;">
+              ${initials}
+            </div>
+            <div style="min-width: 0;">
+              <span style="font-size: 12px; font-weight: 500; color: var(--text-primary); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${name}</span>
+              <span style="font-size: 10.5px; font-family: var(--font-mono); color: var(--text-muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${state.currentUser.email}</span>
+            </div>
+          </div>
+          <button onclick="handleLogout()" class="btn-action-icon" style="width: 24px; height: 24px; flex-shrink: 0;" title="Sign Out">
+            <i data-lucide="log-out" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
+      `;
+    }
+
+    if (cmdSlot) {
+      cmdSlot.innerHTML = `
+        <button onclick="switchView('profile')" class="btn-action-icon" style="width: auto; padding: 0 8px; font-size: 11px; height: 32px; gap: 5px;" title="View Profile">
+          <span style="width: 16px; height: 16px; border-radius: 50%; background: var(--accent-primary); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; font-weight: 600;">${initials[0]}</span>
+          <span style="font-weight: 500;">${name.split(' ')[0]}</span>
+        </button>
+      `;
+    }
+  } else {
+    if (railSection) {
+      railSection.innerHTML = `
+        <button onclick="openAuthModal()" class="rail-nav-item" style="background: var(--bg-elevated); border-color: var(--border-subtle); justify-content: center; gap: 6px; padding: 8px;">
+          <i data-lucide="log-in" class="rail-nav-icon" style="width: 14px; height: 14px;"></i>
+          <span style="font-size: 12px; font-weight: 600;">Sign In / Register</span>
+        </button>
+      `;
+    }
+
+    if (cmdSlot) {
+      cmdSlot.innerHTML = `
+        <button onclick="openAuthModal()" class="btn-primary-apply" style="padding: 5px 10px; font-size: 11.5px; height: 32px;">
+          <i data-lucide="user" style="width: 13px; height: 13px;"></i>
+          <span>Sign In</span>
+        </button>
+      `;
+    }
+  }
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function openAuthModal(defaultTab = 'login') {
+  setAuthTab(defaultTab);
+  document.getElementById('auth-error-alert').style.display = 'none';
+  document.getElementById('modal-auth').classList.add('open');
+}
+
+function closeAuthModal(e) {
+  if (e && e.target !== e.currentTarget && !e.target.closest('.drawer-close-btn')) return;
+  document.getElementById('modal-auth').classList.remove('open');
+}
+
+function setAuthTab(tab) {
+  const isLogin = tab === 'login';
+  document.getElementById('auth-tab-login').classList.toggle('active', isLogin);
+  document.getElementById('auth-tab-signup').classList.toggle('active', !isLogin);
+  document.getElementById('form-login').style.display = isLogin ? 'flex' : 'none';
+  document.getElementById('form-signup').style.display = !isLogin ? 'flex' : 'none';
+  document.getElementById('auth-modal-title').textContent = isLogin ? 'Sign In to JobRadar' : 'Create Candidate Account';
+  document.getElementById('auth-error-alert').style.display = 'none';
+}
+
+async function handleLoginSubmit(e) {
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errorAlert = document.getElementById('auth-error-alert');
+  const btn = document.getElementById('btn-login-submit');
+
+  errorAlert.style.display = 'none';
+  btn.textContent = 'Authenticating...';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (data.success && data.token) {
+      state.authToken = data.token;
+      state.currentUser = data.user;
+      localStorage.setItem('jobradar_token', data.token);
+
+      closeAuthModal();
+      showToast(`Welcome back, ${data.user.fullName || data.user.email}!`, 'check');
+      renderAuthWidgets();
+
+      await Promise.allSettled([loadUserProfile(), loadApplications()]);
+      triggerSearch();
+    } else {
+      errorAlert.textContent = data.error || 'Invalid credentials';
+      errorAlert.style.display = 'block';
+    }
+  } catch (err) {
+    errorAlert.textContent = 'Server connection error: ' + err.message;
+    errorAlert.style.display = 'block';
+  } finally {
+    btn.textContent = 'Sign In';
+  }
+}
+
+async function handleSignupSubmit(e) {
+  e.preventDefault();
+  const fullName = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const errorAlert = document.getElementById('auth-error-alert');
+  const btn = document.getElementById('btn-signup-submit');
+
+  errorAlert.style.display = 'none';
+  btn.textContent = 'Creating account...';
+
+  try {
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fullName, email, password })
+    });
+    const data = await res.json();
+    if (data.success && data.token) {
+      state.authToken = data.token;
+      state.currentUser = data.user;
+      localStorage.setItem('jobradar_token', data.token);
+
+      closeAuthModal();
+      showToast(`Account created! Welcome, ${data.user.fullName}!`, 'check');
+      renderAuthWidgets();
+
+      await Promise.allSettled([loadUserProfile(), loadApplications()]);
+      triggerSearch();
+    } else {
+      errorAlert.textContent = data.error || 'Failed to create account';
+      errorAlert.style.display = 'block';
+    }
+  } catch (err) {
+    errorAlert.textContent = 'Server connection error: ' + err.message;
+    errorAlert.style.display = 'block';
+  } finally {
+    btn.textContent = 'Create Account';
+  }
+}
+
+async function handleDemoLogin() {
+  try {
+    const res = await fetch('/api/auth/demo', { method: 'POST' });
+    const data = await res.json();
+    if (data.success && data.token) {
+      state.authToken = data.token;
+      state.currentUser = data.user;
+      localStorage.setItem('jobradar_token', data.token);
+
+      closeAuthModal();
+      showToast('Signed in with 1-Click Demo Account', 'zap');
+      renderAuthWidgets();
+
+      await Promise.allSettled([loadUserProfile(), loadApplications()]);
+      triggerSearch();
+    }
+  } catch (err) {
+    showToast('Failed to sign in demo account', 'alert-circle');
+  }
+}
+
+function handleLogout() {
+  state.authToken = null;
+  state.currentUser = null;
+  localStorage.removeItem('jobradar_token');
+  showToast('Signed out successfully', 'log-out');
+  renderAuthWidgets();
+  loadUserProfile();
+  loadApplications();
+}
 
 // ==================== THEME CONTROLLER ====================
 function toggleTheme() {
@@ -92,7 +331,6 @@ function switchView(viewName) {
 // ==================== KEYBOARD FIRST NAVIGATION ====================
 function setupKeyboardNavigation() {
   window.addEventListener('keydown', (e) => {
-    // If inside text input / textarea, only check Escape or Cmd+K
     const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName);
 
     // ⌘K or Ctrl+K: Focus Search Input
@@ -111,6 +349,7 @@ function setupKeyboardNavigation() {
       closeDrawer();
       closeShortcutsModal();
       closeAddFeedModal();
+      closeAuthModal();
       return;
     }
 
@@ -209,7 +448,9 @@ async function triggerSearch(forceRefresh = false) {
     });
     if (forceRefresh) params.append('refresh', 'true');
 
-    const res = await fetch(`/api/jobs?${params.toString()}`);
+    const res = await fetch(`/api/jobs?${params.toString()}`, {
+      headers: getAuthHeaders(true)
+    });
     const data = await res.json();
 
     if (data.success && data.jobs) {
@@ -321,7 +562,6 @@ function renderJobFeed(jobs) {
     const score = job.matchScore !== undefined ? job.matchScore : 50;
     const scoreClass = score >= 80 ? 'high' : (score >= 55 ? 'med' : 'low');
 
-    // Matched skills highlight
     const matchedSet = new Set((job.matchedSkills || []).map(s => s.toLowerCase()));
     const tags = Array.isArray(job.tags) ? job.tags.slice(0, 5) : [];
 
@@ -434,7 +674,6 @@ function openDrawer(job) {
   if (drawer) drawer.classList.add('open');
   if (backdrop) backdrop.classList.add('open');
 
-  // Highlight selected card
   document.querySelectorAll('.job-card').forEach((card, idx) => {
     card.classList.toggle('is-active-inspect', state.jobs[idx] && state.jobs[idx].id === job.id);
   });
@@ -533,7 +772,7 @@ async function generatePitchForDrawer() {
   try {
     const res = await fetch('/api/ai/pitch', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(true),
       body: JSON.stringify({
         job,
         language: lang
@@ -584,7 +823,9 @@ function openDrawerMailto() {
 // ==================== KANBAN APPLICATION PIPELINE ====================
 async function loadApplications() {
   try {
-    const res = await fetch('/api/applications');
+    const res = await fetch('/api/applications', {
+      headers: getAuthHeaders(true)
+    });
     const data = await res.json();
     if (data.success && data.applications) {
       state.applications = data.applications;
@@ -600,7 +841,6 @@ function updateTrackerCount() {
   const badge = document.getElementById('rail-tracker-count');
   if (badge) badge.textContent = state.applications.length;
 
-  // Check 7-day follow-up reminder
   const now = Date.now();
   const needFollowUp = state.applications.filter(a => {
     if (a.status !== 'Applied' && a.status !== 'Technical_Test') return false;
@@ -728,7 +968,7 @@ async function saveApplicationRecord(payload) {
   try {
     const res = await fetch('/api/applications', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(true),
       body: JSON.stringify(payload)
     });
     if (res.ok) {
@@ -744,7 +984,7 @@ async function updateApplicationStatus(id, status) {
   try {
     await fetch(`/api/applications/${id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(true),
       body: JSON.stringify({ status })
     });
     await loadApplications();
@@ -756,7 +996,10 @@ async function updateApplicationStatus(id, status) {
 
 async function deleteApplication(id) {
   try {
-    await fetch(`/api/applications/${id}`, { method: 'DELETE' });
+    await fetch(`/api/applications/${id}`, { 
+      method: 'DELETE',
+      headers: getAuthHeaders(true)
+    });
     await loadApplications();
     renderJobFeed(state.jobs);
   } catch (e) {
@@ -804,6 +1047,7 @@ async function handleCvUpload(e) {
   try {
     const res = await fetch('/api/profile/upload-cv', {
       method: 'POST',
+      headers: state.authToken ? { 'Authorization': `Bearer ${state.authToken}` } : {},
       body: formData
     });
     const data = await res.json();
@@ -822,7 +1066,9 @@ async function handleCvUpload(e) {
 
 async function loadUserProfile() {
   try {
-    const res = await fetch('/api/profile');
+    const res = await fetch('/api/profile', {
+      headers: getAuthHeaders(true)
+    });
     const data = await res.json();
     if (data.success && data.profile) {
       state.profile = data.profile;
@@ -852,7 +1098,7 @@ async function saveUserProfile(e) {
   try {
     const res = await fetch('/api/profile', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(true),
       body: JSON.stringify(payload)
     });
     if (res.ok) {
@@ -954,7 +1200,7 @@ async function handleAddFeedSubmit(e) {
   try {
     const res = await fetch('/api/custom-providers', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(true),
       body: JSON.stringify({ name, url, type })
     });
     if (res.ok) {

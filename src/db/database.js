@@ -16,6 +16,17 @@ db.pragma('foreign_keys = ON');
 
 function initSchema() {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      full_name TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
     CREATE TABLE IF NOT EXISTS jobs (
       id TEXT PRIMARY KEY,
       external_id TEXT,
@@ -103,6 +114,24 @@ function initSchema() {
       error_message TEXT
     );
   `);
+
+  // Safe migration of existing SQLite tables if user_id column wasn't there
+  try {
+    db.prepare("ALTER TABLE applications ADD COLUMN user_id TEXT DEFAULT 'default'").run();
+  } catch (e) {}
+
+  try {
+    db.prepare("ALTER TABLE user_profile ADD COLUMN user_id TEXT DEFAULT 'default'").run();
+  } catch (e) {}
+
+  // Safe index creation
+  try {
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_applications_user ON applications(user_id)").run();
+  } catch (e) {}
+
+  try {
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_profile_user ON user_profile(user_id)").run();
+  } catch (e) {}
 }
 
 initSchema();

@@ -1,8 +1,11 @@
 const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/database');
+const { optionalAuth } = require('../middleware/auth.middleware');
 
 const router = express.Router();
+
+router.use(optionalAuth);
 
 const applicationSchema = z.object({
   id: z.string().optional(),
@@ -12,7 +15,7 @@ const applicationSchema = z.object({
   job_title: z.string().optional(),
   company: z.string().min(1, 'Company is required'),
   location: z.string().optional(),
-  url: z.string().url('Invalid URL').or(z.string().min(1)),
+  url: z.string().optional().default(''),
   source: z.string().optional(),
   status: z.enum(['Saved', 'Applied', 'Technical_Test', 'Interview', 'Offer', 'Rejected']).optional(),
   notes: z.string().optional(),
@@ -24,8 +27,13 @@ const applicationSchema = z.object({
 // GET /api/applications
 router.get('/', (req, res) => {
   try {
-    const apps = db.prepare('SELECT * FROM applications ORDER BY updated_at DESC').all();
-    // Normalize properties for backwards compatibility
+    const userId = req.user?.id || 'default';
+    const apps = db.prepare(`
+      SELECT * FROM applications 
+      WHERE user_id = ? OR (user_id = 'default' AND ? = 'default')
+      ORDER BY updated_at DESC
+    `).all(userId, userId);
+
     const normalized = apps.map(a => ({
       id: a.id,
       jobId: a.job_id,
@@ -55,15 +63,17 @@ router.post('/', (req, res) => {
     const id = validated.id || `app-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const jobTitle = validated.job_title || validated.title || 'Untitled Role';
     const now = new Date().toISOString();
+    const userId = req.user?.id || 'default';
 
     const insert = db.prepare(`
       INSERT INTO applications (
-        id, job_id, job_title, company, location, url, source, status, notes, applied_at, follow_up_at, cover_letter, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, user_id, job_id, job_title, company, location, url, source, status, notes, applied_at, follow_up_at, cover_letter, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     insert.run(
       id,
+      userId,
       validated.job_id || validated.jobId || null,
       jobTitle,
       validated.company,
@@ -98,7 +108,7 @@ router.post('/', (req, res) => {
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: err.errors.map(e => e.message).join(', ') });
+      return res.status(400).json({ success: false, error: err.issues.map(e => e.message).join(', ') });
     }
     res.status(500).json({ success: false, error: err.message });
   }
@@ -128,7 +138,7 @@ router.patch('/:id', (req, res) => {
         status = COALESCE(?, status),
         notes = COALESCE(?, notes),
         follow_up_at = COALESCE(?, follow_up_at),
-        applied_at = ?,
+        applied_at = COALESCE(?, applied_at),
         cover_letter = COALESCE(?, cover_letter),
         updated_at = ?
       WHERE id = ?
@@ -136,29 +146,14 @@ router.patch('/:id', (req, res) => {
       status || null,
       notes !== undefined ? notes : null,
       follow_up_at !== undefined ? follow_up_at : null,
-      newAppliedAt,
+      newAppliedAt || null,
       cover_letter !== undefined ? cover_letter : null,
       now,
       id
     );
 
     const updated = db.prepare('SELECT * FROM applications WHERE id = ?').get(id);
-    res.json({
-      success: true,
-      application: {
-        id: updated.id,
-        title: updated.job_title,
-        company: updated.company,
-        location: updated.location,
-        url: updated.url,
-        source: updated.source,
-        status: updated.status,
-        notes: updated.notes,
-        dateAdded: updated.created_at,
-        dateApplied: updated.applied_at,
-        followUpAt: updated.follow_up_at
-      }
-    });
+    res.json({ success: true, application: updated });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -172,34 +167,42 @@ router.delete('/:id', (req, res) => {
     if (result.changes === 0) {
       return res.status(404).json({ success: false, error: 'Application not found' });
     }
-    res.json({ success: true, message: 'Application deleted successfully' });
+    res.json({ success: true, message: 'Application deleted' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// GET /api/export/applications (CSV Export)
+// GET /api/applications/export/csv
 router.get('/export/csv', (req, res) => {
   try {
-    const apps = db.prepare('SELECT * FROM applications ORDER BY created_at DESC').all();
-    const headers = ['Title', 'Company', 'Location', 'Status', 'Date Added', 'Date Applied', 'URL', 'Notes'];
+    const userId = req.user?.id || 'default';
+    const apps = db.prepare(`
+      SELECT * FROM applications 
+      WHERE user_id = ? OR (user_id = 'default' AND ? = 'default')
+      ORDER BY updated_at DESC
+    `).all(userId, userId);
+
+    const headers = ['Company', 'Job Title', 'Location', 'URL', 'Source', 'Status', 'Date Applied', 'Follow-up Date', 'Notes'];
     const rows = apps.map(a => [
-      `"${(a.job_title || '').replace(/"/g, '""')}"`,
       `"${(a.company || '').replace(/"/g, '""')}"`,
+      `"${(a.job_title || '').replace(/"/g, '""')}"`,
       `"${(a.location || '').replace(/"/g, '""')}"`,
-      `"${(a.status || '').replace(/"/g, '""')}"`,
-      `"${(a.created_at || '').replace(/"/g, '""')}"`,
-      `"${(a.applied_at || '').replace(/"/g, '""')}"`,
       `"${(a.url || '').replace(/"/g, '""')}"`,
+      `"${(a.source || '').replace(/"/g, '""')}"`,
+      `"${(a.status || '').replace(/"/g, '""')}"`,
+      `"${(a.applied_at || '').replace(/"/g, '""')}"`,
+      `"${(a.follow_up_at || '').replace(/"/g, '""')}"`,
       `"${(a.notes || '').replace(/"/g, '""')}"`
     ]);
 
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="jobradar_applications.csv"');
-    res.send(csvContent);
+    res.setHeader('Content-Disposition', `attachment; filename=jobradar_applications_${Date.now()}.csv`);
+    res.status(200).send(csvContent);
   } catch (err) {
-    res.status(500).send('Error generating applications CSV: ' + err.message);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

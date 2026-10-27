@@ -4,8 +4,12 @@ const { z } = require('zod');
 const { db } = require('../db/database');
 const { extractTextFromPdf } = require('../utils/pdfParser');
 const { extractSkillsFromText } = require('../services/matchingEngine');
+const { optionalAuth } = require('../middleware/auth.middleware');
 
 const router = express.Router();
+
+router.use(optionalAuth);
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
@@ -30,14 +34,16 @@ const profileSchema = z.object({
 // GET /api/profile
 router.get('/', (req, res) => {
   try {
-    const row = db.prepare('SELECT * FROM user_profile WHERE id = ?').get('default');
+    const userId = req.user?.id || 'default';
+    const row = db.prepare('SELECT * FROM user_profile WHERE user_id = ? OR id = ?').get(userId, userId);
+
     if (!row) {
       return res.json({
         success: true,
         profile: {
-          fullName: 'Tech Professional',
-          title: 'Software Engineer',
-          email: '',
+          fullName: req.user?.fullName || 'Candidate',
+          title: 'Software Developer',
+          email: req.user?.email || '',
           phone: '',
           location: 'Morocco',
           skills: 'JavaScript, Python, React, Node.js, SQL, Docker',
@@ -66,14 +72,15 @@ router.get('/', (req, res) => {
       success: true,
       profile: {
         id: row.id,
-        fullName: row.full_name,
-        title: row.title,
-        email: row.email,
-        phone: row.phone,
-        location: row.location,
-        linkedinUrl: row.linkedin_url,
-        githubUrl: row.github_url,
-        portfolioUrl: row.portfolio_url,
+        userId: row.user_id,
+        fullName: row.full_name || req.user?.fullName || 'Candidate',
+        title: row.title || 'Software Developer',
+        email: row.email || req.user?.email || '',
+        phone: row.phone || '',
+        location: row.location || 'Morocco',
+        linkedinUrl: row.linkedin_url || '',
+        githubUrl: row.github_url || '',
+        portfolioUrl: row.portfolio_url || '',
         skills: Array.isArray(skills) ? skills.join(', ') : skills,
         skillsList: skills,
         languages: languages,
@@ -93,7 +100,8 @@ router.get('/', (req, res) => {
 router.post('/', (req, res) => {
   try {
     const validated = profileSchema.parse(req.body);
-    const existing = db.prepare('SELECT id FROM user_profile WHERE id = ?').get('default');
+    const userId = req.user?.id || 'default';
+    const existing = db.prepare('SELECT id FROM user_profile WHERE user_id = ? OR id = ?').get(userId, userId);
 
     let skillsArray = [];
     if (Array.isArray(validated.skills)) {
@@ -118,7 +126,7 @@ router.post('/', (req, res) => {
           skills_json = ?,
           education_summary = COALESCE(?, education_summary),
           updated_at = ?
-        WHERE id = 'default'
+        WHERE id = ? OR user_id = ?
       `).run(
         validated.fullName || null,
         validated.title || null,
@@ -130,17 +138,21 @@ router.post('/', (req, res) => {
         validated.portfolioUrl || null,
         JSON.stringify(skillsArray),
         validated.educationSummary || null,
-        now
+        now,
+        existing.id,
+        userId
       );
     } else {
       db.prepare(`
         INSERT INTO user_profile (
-          id, full_name, title, email, phone, location, linkedin_url, github_url, portfolio_url, skills_json, education_summary, updated_at
-        ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, user_id, full_name, title, email, phone, location, linkedin_url, github_url, portfolio_url, skills_json, education_summary, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        validated.fullName || 'Candidate',
+        userId,
+        userId,
+        validated.fullName || req.user?.fullName || 'Candidate',
         validated.title || 'Software Developer',
-        validated.email || '',
+        validated.email || req.user?.email || '',
         validated.phone || '',
         validated.location || 'Morocco',
         validated.linkedinUrl || '',
@@ -155,7 +167,7 @@ router.post('/', (req, res) => {
     res.json({ success: true, message: 'Profile updated successfully' });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: err.errors.map(e => e.message).join(', ') });
+      return res.status(400).json({ success: false, error: err.issues.map(e => e.message).join(', ') });
     }
     res.status(500).json({ success: false, error: err.message });
   }
@@ -176,24 +188,21 @@ router.post('/upload-cv', upload.single('cv'), async (req, res) => {
       });
     }
 
-    // Auto-detect skills
+    const userId = req.user?.id || 'default';
     const detectedSkills = extractSkillsFromText(rawText);
 
-    // Extract potential email
+    // Extract potential email, phone, linkedin, github
     const emailMatch = rawText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-    // Extract potential phone (Moroccan / international)
     const phoneMatch = rawText.match(/(?:\+212|0)[5-7]\d{8}/);
-    // Extract potential LinkedIn
     const linkedinMatch = rawText.match(/linkedin\.com\/in\/[a-zA-Z0-9_-]+/i);
-    // Extract potential GitHub
     const githubMatch = rawText.match(/github\.com\/[a-zA-Z0-9_-]+/i);
 
     const now = new Date().toISOString();
 
     db.prepare(`
       INSERT INTO user_profile (
-        id, email, phone, linkedin_url, github_url, skills_json, raw_cv_text, updated_at
-      ) VALUES ('default', ?, ?, ?, ?, ?, ?, ?)
+        id, user_id, email, phone, linkedin_url, github_url, skills_json, raw_cv_text, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         email = CASE WHEN email IS NULL OR email = '' THEN excluded.email ELSE email END,
         phone = CASE WHEN phone IS NULL OR phone = '' THEN excluded.phone ELSE phone END,
@@ -203,7 +212,9 @@ router.post('/upload-cv', upload.single('cv'), async (req, res) => {
         raw_cv_text = excluded.raw_cv_text,
         updated_at = excluded.updated_at
     `).run(
-      emailMatch ? emailMatch[0] : null,
+      userId,
+      userId,
+      emailMatch ? emailMatch[0] : (req.user?.email || null),
       phoneMatch ? phoneMatch[0] : null,
       linkedinMatch ? `https://${linkedinMatch[0]}` : null,
       githubMatch ? `https://${githubMatch[0]}` : null,
@@ -212,7 +223,7 @@ router.post('/upload-cv', upload.single('cv'), async (req, res) => {
       now
     );
 
-    const updated = db.prepare('SELECT * FROM user_profile WHERE id = ?').get('default');
+    const updated = db.prepare('SELECT * FROM user_profile WHERE user_id = ? OR id = ?').get(userId, userId);
 
     res.json({
       success: true,

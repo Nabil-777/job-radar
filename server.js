@@ -15,6 +15,7 @@ const { searchJobs, DOMAIN_PRESETS } = require('./services/aggregator');
 const { startRadarCron } = require('./src/jobs/radarCron');
 
 // Modular Route Controllers
+const authRoutes = require('./src/routes/auth.routes');
 const jobsRoutes = require('./src/routes/jobs.routes');
 const applicationsRoutes = require('./src/routes/applications.routes');
 const profileRoutes = require('./src/routes/profile.routes');
@@ -46,6 +47,7 @@ app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Mount API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/applications', applicationsRoutes);
 app.use('/api/profile', profileRoutes);

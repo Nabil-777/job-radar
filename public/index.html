@@ -100,6 +100,11 @@
         </div>
       </div>
 
+      <!-- User Account Widget -->
+      <div id="rail-auth-section" class="rail-auth-section">
+        <!-- Rendered dynamically by app.js: user pill or login button -->
+      </div>
+
       <!-- Rail Footer -->
       <div class="rail-footer">
         <button onclick="toggleTheme()" class="rail-footer-btn" title="Toggle Theme (Dark / Light)">
@@ -167,7 +172,7 @@
           </select>
         </div>
 
-        <!-- View Switcher & Sync -->
+        <!-- View Switcher, Sync & Auth Pill -->
         <div class="command-actions">
           <div class="segmented-switcher">
             <button id="btn-view-list" onclick="setFeedViewMode('list')" class="segmented-btn active" title="Compact List View">
@@ -180,6 +185,7 @@
           <button id="btn-sync" onclick="triggerSearch(true)" class="btn-icon-subtle" title="Force fresh scrape bypass cache">
             <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
           </button>
+          <div id="cmd-user-slot"></div>
         </div>
       </header>
 
@@ -546,6 +552,71 @@
       </div>
     </aside>
 
+  </div>
+
+  <!-- ==================== AUTH MODAL (SIGN IN / SIGN UP) ==================== -->
+  <div id="modal-auth" class="craft-modal-overlay" onclick="closeAuthModal(event)">
+    <div class="craft-modal" style="max-width: 420px;">
+      <!-- Modal Header -->
+      <div class="craft-modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="brand-icon-box" style="width: 24px; height: 24px;">
+            <i data-lucide="user" style="width: 13px; height: 13px;"></i>
+          </div>
+          <h4 id="auth-modal-title" style="font-size: 14px; font-weight: 600; color: var(--text-primary);">Candidate Account</h4>
+        </div>
+        <button onclick="closeAuthModal()" class="drawer-close-btn"><i data-lucide="x" style="width: 15px; height: 15px;"></i></button>
+      </div>
+
+      <!-- Tab Switcher (Sign In vs Sign Up) -->
+      <div style="padding: 10px 20px 0 20px; display: flex; gap: 6px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface);">
+        <button id="auth-tab-login" onclick="setAuthTab('login')" class="drawer-tab-btn active" style="padding-bottom: 8px;">Sign In</button>
+        <button id="auth-tab-signup" onclick="setAuthTab('signup')" class="drawer-tab-btn" style="padding-bottom: 8px;">Create Account</button>
+      </div>
+
+      <!-- Auth Form Body -->
+      <div class="craft-modal-body" style="padding: 20px;">
+        <div id="auth-error-alert" style="display: none; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--danger-bg); border: 1px solid rgba(239, 68, 68, 0.3); color: var(--danger-fg); font-size: 11.5px;"></div>
+
+        <!-- Sign In Form -->
+        <form id="form-login" onsubmit="handleLoginSubmit(event)" style="display: flex; flex-direction: column; gap: 12px;">
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Email Address</label>
+            <input type="email" id="login-email" required placeholder="you@example.com" class="search-input" style="padding-left: 10px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Password</label>
+            <input type="password" id="login-password" required placeholder="••••••••" class="search-input" style="padding-left: 10px;">
+          </div>
+          <button type="submit" id="btn-login-submit" class="btn-primary-apply" style="width: 100%; justify-content: center; height: 36px; margin-top: 4px;">Sign In</button>
+        </form>
+
+        <!-- Sign Up Form -->
+        <form id="form-signup" onsubmit="handleSignupSubmit(event)" style="display: none; flex-direction: column; gap: 12px;">
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Full Name</label>
+            <input type="text" id="signup-name" required placeholder="e.g. Nabil Baghoughi" class="search-input" style="padding-left: 10px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Email Address</label>
+            <input type="email" id="signup-email" required placeholder="you@example.com" class="search-input" style="padding-left: 10px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">Password (min 6 characters)</label>
+            <input type="password" id="signup-password" minlength="6" required placeholder="••••••••" class="search-input" style="padding-left: 10px;">
+          </div>
+          <button type="submit" id="btn-signup-submit" class="btn-primary-apply" style="width: 100%; justify-content: center; height: 36px; margin-top: 4px;">Create Account</button>
+        </form>
+
+        <!-- 1-Click Demo Account Quick Action -->
+        <div style="display: flex; align-items: center; justify-content: center; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--border-subtle);">
+          <button onclick="handleDemoLogin()" type="button" class="rail-footer-btn" style="width: 100%; justify-content: center; height: 32px; gap: 6px;">
+            <i data-lucide="zap" style="width: 13px; height: 13px; color: var(--accent-primary);"></i>
+            <span>Instant 1-Click Demo Login</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Keyboard Shortcuts Cheat Sheet Modal -->
