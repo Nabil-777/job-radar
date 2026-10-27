@@ -524,6 +524,7 @@
               <button id="ai-tab-linkedin" onclick="setPitchMode('linkedin')" class="ai-seg-btn">LinkedIn Note</button>
               <button id="ai-tab-cold" onclick="setPitchMode('cold')" class="ai-seg-btn">Cold Email</button>
               <button id="ai-tab-tips" onclick="setPitchMode('tips')" class="ai-seg-btn">CV Tips</button>
+              <button id="ai-tab-cv" onclick="setPitchMode('cv')" class="ai-seg-btn">Tailored CV</button>
             </div>
             <select id="ai-lang-select" onchange="generatePitchForDrawer()" class="filter-select" style="height: 28px; font-size: 11px; padding: 0 20px 0 8px;">
               <option value="English">EN</option>
@@ -541,13 +542,17 @@
               <span>Regenerate</span>
             </button>
             <div style="display: flex; align-items: center; gap: 6px;">
+              <button onclick="openTailoredCvModal()" class="btn-primary-apply" style="padding: 5px 12px; font-size: 11.5px; height: 30px; gap: 5px;" title="Open full-screen Tailored CV Studio & export PDF">
+                <i data-lucide="file-badge-2" style="width: 13px; height: 13px;"></i>
+                <span>CV Studio & PDF</span>
+              </button>
               <button id="btn-drawer-copy" onclick="copyDrawerPitch()" class="btn-action-icon" style="width: auto; padding: 0 10px; font-size: 11.5px; height: 30px;">
                 <i data-lucide="copy" style="width: 13px; height: 13px; margin-right: 4px;"></i>
                 <span>Copy</span>
               </button>
-              <button onclick="openDrawerMailto()" class="btn-primary-apply" style="padding: 5px 10px; font-size: 11.5px; height: 30px;">
-                <span>Email App</span>
-                <i data-lucide="external-link" style="width: 12px; height: 12px;"></i>
+              <button onclick="openDrawerMailto()" class="btn-action-icon" style="width: auto; padding: 0 10px; font-size: 11.5px; height: 30px;" title="Open in default email client">
+                <span>Email</span>
+                <i data-lucide="external-link" style="width: 12px; height: 12px; margin-left: 4px;"></i>
               </button>
             </div>
           </div>
@@ -617,6 +622,61 @@
             <i data-lucide="zap" style="width: 13px; height: 13px; color: var(--accent-primary);"></i>
             <span>Instant 1-Click Demo Login</span>
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TAILORED CV STUDIO MODAL ==================== -->
+  <div id="modal-tailored-cv" class="craft-modal-overlay" onclick="closeTailoredCvModal(event)">
+    <div class="craft-modal tailored-cv-modal" style="max-width: 900px; width: 95vw; height: 90vh; display: flex; flex-direction: column;">
+      <!-- Modal Header -->
+      <div class="craft-modal-header" style="flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div class="brand-icon-box" style="width: 26px; height: 26px;">
+            <i data-lucide="file-badge-2" style="width: 14px; height: 14px; color: var(--match-high-fg);"></i>
+          </div>
+          <div>
+            <h4 id="cv-modal-title" style="font-size: 13.5px; font-weight: 600; color: var(--text-primary);">Tailored CV Studio</h4>
+            <p id="cv-modal-subtitle" style="font-size: 11px; font-family: var(--font-mono); color: var(--text-muted); margin-top: 1px;"></p>
+          </div>
+        </div>
+
+        <!-- Studio Actions -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <select id="cv-modal-lang" onchange="regenerateTailoredCv()" class="filter-select" style="height: 28px; font-size: 11px; padding: 0 20px 0 8px;">
+            <option value="English">EN</option>
+            <option value="French">FR</option>
+          </select>
+          <button onclick="regenerateTailoredCv()" class="btn-action-icon" style="width: auto; padding: 0 10px; font-size: 11.5px; height: 28px; gap: 4px;" title="Regenerate with fresh AI tailoring">
+            <i data-lucide="sparkles" style="width: 12px; height: 12px;"></i>
+            <span>Regenerate</span>
+          </button>
+          <button onclick="copyTailoredCvMarkdown()" class="btn-action-icon" style="width: auto; padding: 0 10px; font-size: 11.5px; height: 28px; gap: 4px;" title="Copy clean Markdown to clipboard">
+            <i data-lucide="copy" style="width: 12px; height: 12px;"></i>
+            <span>Copy Markdown</span>
+          </button>
+          <button onclick="printTailoredCv()" class="btn-primary-apply" style="padding: 4px 12px; font-size: 11.5px; height: 28px; gap: 5px;" title="Print or save as clean PDF">
+            <i data-lucide="printer" style="width: 12px; height: 12px;"></i>
+            <span>Print / PDF</span>
+          </button>
+          <button onclick="closeTailoredCvModal()" class="drawer-close-btn"><i data-lucide="x" style="width: 15px; height: 15px;"></i></button>
+        </div>
+      </div>
+
+      <!-- Notice Bar -->
+      <div style="background: var(--bg-canvas); padding: 7px 18px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; color: var(--text-muted); flex-shrink: 0;">
+        <span style="display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="pencil" style="width: 12px; height: 12px; color: var(--accent-primary);"></i>
+          <span>Click any text directly on this resume to edit or personalize before exporting.</span>
+        </span>
+        <span id="cv-ats-badge" class="contract-pill" style="color: var(--match-high-fg); background: var(--match-high-bg); border-color: var(--match-high-border);">ATS Optimized</span>
+      </div>
+
+      <!-- Printable Resume Canvas -->
+      <div class="craft-modal-body" style="flex: 1; overflow-y: auto; padding: 24px; background: var(--bg-canvas);">
+        <div id="tailored-cv-paper" class="tailored-cv-paper" contenteditable="true" spellcheck="false">
+          <!-- Dynamically populated by app.js -->
         </div>
       </div>
     </div>

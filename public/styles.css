@@ -1503,3 +1503,228 @@ html, body {
   gap: 8px;
   background: var(--bg-canvas);
 }
+
+/* ==================== TAILORED CV STUDIO & PRINT STYLES ==================== */
+.tailored-cv-paper {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 36px 42px;
+  max-width: 780px;
+  margin: 0 auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  outline: none;
+  cursor: text;
+  transition: border-color 140ms ease;
+}
+
+.tailored-cv-paper:focus {
+  border-color: var(--border-focus);
+}
+
+.cv-header-block {
+  border-bottom: 2px solid var(--border-strong);
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+}
+
+.cv-candidate-name {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.cv-targeted-role {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--accent-primary);
+  margin-top: 4px;
+}
+
+.cv-contact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.cv-contact-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cv-section {
+  margin-bottom: 18px;
+}
+
+.cv-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cv-summary-text {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.cv-skills-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.cv-skill-line strong {
+  color: var(--text-primary);
+  font-size: 11.5px;
+}
+
+.cv-skill-line span {
+  color: var(--text-secondary);
+}
+
+.cv-job-entry {
+  margin-bottom: 12px;
+}
+
+.cv-job-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+
+.cv-job-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cv-job-company {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.cv-job-period {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cv-bullet-list {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.cv-bullet-list li {
+  margin-bottom: 3px;
+}
+
+/* Print CSS */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #modal-tailored-cv,
+  #modal-tailored-cv .craft-modal,
+  #modal-tailored-cv .craft-modal-body,
+  #modal-tailored-cv #tailored-cv-paper,
+  #modal-tailored-cv #tailored-cv-paper * {
+    visibility: visible !important;
+  }
+
+  #modal-tailored-cv {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #modal-tailored-cv .craft-modal {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+
+  #modal-tailored-cv .craft-modal-header,
+  #modal-tailored-cv > div:nth-child(2),
+  .craft-modal-header,
+  .drawer-close-btn {
+    display: none !important;
+  }
+
+  #modal-tailored-cv .craft-modal-body {
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  #tailored-cv-paper {
+    background: #ffffff !important;
+    color: #111827 !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 10mm 15mm !important;
+    max-width: 100% !important;
+  }
+
+  .cv-candidate-name {
+    color: #111827 !important;
+  }
+
+  .cv-targeted-role {
+    color: #4F46E5 !important;
+  }
+
+  .cv-contact-row,
+  .cv-summary-text,
+  .cv-skill-line span,
+  .cv-bullet-list {
+    color: #374151 !important;
+  }
+
+  .cv-header-block,
+  .cv-section-title {
+    border-color: #D1D5DB !important;
+    color: #111827 !important;
+  }
+
+  .cv-job-title,
+  .cv-skill-line strong {
+    color: #111827 !important;
+  }
+}

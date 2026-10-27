@@ -18,8 +18,10 @@ const state = {
   customProviders: [],
   selectedIndex: -1,             // Keyboard focused job index
   activeDrawerJob: null,         // Currently inspected job in right slide-over
-  activePitchMode: 'letter',     // 'letter' | 'linkedin' | 'cold' | 'tips'
+  activePitchMode: 'letter',     // 'letter' | 'linkedin' | 'cold' | 'tips' | 'cv'
   pitchDataCache: {},            // Cache generated pitches by jobId
+  tailoredCvCache: {},           // Cache tailored CVs by jobId_language
+  activeTailoredCv: null,
   theme: localStorage.getItem('jobradar_theme') || 'dark'
 };
 
@@ -551,6 +553,7 @@ function setupKeyboardNavigation() {
       closeShortcutsModal();
       closeAddFeedModal();
       closeAuthModal();
+      closeTailoredCvModal();
       return;
     }
 
@@ -955,7 +958,7 @@ function quickOpenPitch(idx) {
 // ==================== AI CO-PILOT STUDIO IN DRAWER ====================
 function setPitchMode(mode) {
   state.activePitchMode = mode;
-  ['letter', 'linkedin', 'cold', 'tips'].forEach(m => {
+  ['letter', 'linkedin', 'cold', 'tips', 'cv'].forEach(m => {
     const btn = document.getElementById(`ai-tab-${m}`);
     if (btn) btn.classList.toggle('active', m === mode);
   });
@@ -968,6 +971,29 @@ async function generatePitchForDrawer() {
   const job = state.activeDrawerJob;
   const lang = document.getElementById('ai-lang-select').value;
   const textEl = document.getElementById('drawer-pitch-text');
+
+  if (state.activePitchMode === 'cv') {
+    textEl.value = 'Generating tailored CV for this opportunity...';
+    try {
+      const res = await fetch('/api/ai/tailored-cv', {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({ job, language: lang })
+      });
+      const data = await res.json();
+      if (data.success && data.tailoredCv) {
+        state.tailoredCvCache[`${job.id}_${lang}`] = data.tailoredCv;
+        state.activeTailoredCv = data.tailoredCv;
+        textEl.value = data.tailoredCv.markdown;
+      } else {
+        textEl.value = 'Failed to generate tailored CV.';
+      }
+    } catch (err) {
+      textEl.value = 'Error generating tailored CV: ' + err.message;
+    }
+    return;
+  }
+
   textEl.value = 'Generating tailored pitch with AI...';
 
   try {
@@ -991,12 +1017,42 @@ async function generatePitchForDrawer() {
   }
 }
 
-function renderCurrentPitchInDrawer() {
+async function renderCurrentPitchInDrawer() {
   if (!state.activeDrawerJob) return;
-  const data = state.pitchDataCache[state.activeDrawerJob.id];
+  const job = state.activeDrawerJob;
+  const textEl = document.getElementById('drawer-pitch-text');
+
+  if (state.activePitchMode === 'cv') {
+    const lang = document.getElementById('ai-lang-select').value;
+    const cacheKey = `${job.id}_${lang}`;
+    if (state.tailoredCvCache[cacheKey]) {
+      textEl.value = state.tailoredCvCache[cacheKey].markdown;
+      return;
+    }
+    textEl.value = 'Generating tailored CV for this opportunity...';
+    try {
+      const res = await fetch('/api/ai/tailored-cv', {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: JSON.stringify({ job, language: lang })
+      });
+      const data = await res.json();
+      if (data.success && data.tailoredCv) {
+        state.tailoredCvCache[cacheKey] = data.tailoredCv;
+        state.activeTailoredCv = data.tailoredCv;
+        textEl.value = data.tailoredCv.markdown;
+      } else {
+        textEl.value = 'Failed to generate tailored CV.';
+      }
+    } catch (e) {
+      textEl.value = 'Error generating tailored CV: ' + e.message;
+    }
+    return;
+  }
+
+  const data = state.pitchDataCache[job.id];
   if (!data) return;
 
-  const textEl = document.getElementById('drawer-pitch-text');
   if (state.activePitchMode === 'letter') {
     textEl.value = data.coverLetter || '';
   } else if (state.activePitchMode === 'linkedin') {
@@ -1019,6 +1075,214 @@ function openDrawerMailto() {
   const subject = encodeURIComponent(`Application: ${state.activeDrawerJob.title} — ${state.profile?.fullName || ''}`);
   const body = encodeURIComponent(document.getElementById('drawer-pitch-text').value);
   window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+}
+
+// ==================== TAILORED CV STUDIO & EXPORT SYSTEM ====================
+async function openTailoredCvModal() {
+  const job = state.activeDrawerJob;
+  if (!job) {
+    showToast('Please select a job opportunity first', 'alert-circle');
+    return;
+  }
+
+  const modal = document.getElementById('modal-tailored-cv');
+  const titleEl = document.getElementById('cv-modal-title');
+  const subEl = document.getElementById('cv-modal-subtitle');
+  const lang = document.getElementById('cv-modal-lang').value;
+  const paper = document.getElementById('tailored-cv-paper');
+
+  titleEl.textContent = `Tailored CV — ${job.title}`;
+  subEl.textContent = `Target: ${job.company} • ${job.location || 'Morocco / Remote'}`;
+  modal.classList.add('open');
+
+  const cacheKey = `${job.id}_${lang}`;
+  if (state.tailoredCvCache[cacheKey]) {
+    state.activeTailoredCv = state.tailoredCvCache[cacheKey];
+    renderTailoredCvPaper(state.tailoredCvCache[cacheKey]);
+    return;
+  }
+
+  paper.innerHTML = `
+    <div style="padding: 48px; text-align: center; color: var(--text-muted); font-family: var(--font-mono);">
+      <i data-lucide="sparkles" style="width: 28px; height: 28px; margin: 0 auto 12px; color: var(--accent-primary); animation: pulse-beacon 1.5s infinite;"></i>
+      <p style="font-size: 13.5px; color: var(--text-primary); font-weight: 500;">Analyzing opportunity & tailoring ATS resume...</p>
+      <p style="font-size: 11.5px; margin-top: 4px; color: var(--text-muted);">Matching your skills, reordering competencies, and generating quantifiable impact bullets.</p>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  await regenerateTailoredCv();
+}
+
+function closeTailoredCvModal(e) {
+  if (e && e.target !== e.currentTarget && !e.target.closest('.drawer-close-btn')) return;
+  const modal = document.getElementById('modal-tailored-cv');
+  if (modal) modal.classList.remove('open');
+}
+
+async function regenerateTailoredCv() {
+  const job = state.activeDrawerJob;
+  if (!job) return;
+
+  const lang = document.getElementById('cv-modal-lang').value;
+  const paper = document.getElementById('tailored-cv-paper');
+  const badge = document.getElementById('cv-ats-badge');
+
+  paper.innerHTML = `
+    <div style="padding: 48px; text-align: center; color: var(--text-muted); font-family: var(--font-mono);">
+      <i data-lucide="sparkles" style="width: 28px; height: 28px; margin: 0 auto 12px; color: var(--accent-primary); animation: pulse-beacon 1.5s infinite;"></i>
+      <p style="font-size: 13.5px; color: var(--text-primary); font-weight: 500;">Tailoring CV for ${job.company} (${lang})...</p>
+    </div>
+  `;
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const res = await fetch('/api/ai/tailored-cv', {
+      method: 'POST',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify({ job, language: lang })
+    });
+    const data = await res.json();
+    if (data.success && data.tailoredCv) {
+      const cacheKey = `${job.id}_${lang}`;
+      state.tailoredCvCache[cacheKey] = data.tailoredCv;
+      state.activeTailoredCv = data.tailoredCv;
+      if (badge && data.tailoredCv.matchScore) {
+        badge.textContent = `${data.tailoredCv.matchScore}% ATS Alignment`;
+      }
+      renderTailoredCvPaper(data.tailoredCv);
+    } else {
+      paper.innerHTML = `<div style="color: var(--danger-fg); padding: 24px;">Failed to generate tailored CV. Please verify connection.</div>`;
+    }
+  } catch (err) {
+    paper.innerHTML = `<div style="color: var(--danger-fg); padding: 24px;">Error: ${err.message}</div>`;
+  }
+}
+
+function renderTailoredCvPaper(cv) {
+  const paper = document.getElementById('tailored-cv-paper');
+  if (!paper) return;
+
+  const contact = cv.contact || {};
+  const contactParts = [
+    contact.location ? `<span class="cv-contact-item"><i data-lucide="map-pin" style="width: 11px; height: 11px;"></i>${contact.location}</span>` : '',
+    contact.email ? `<span class="cv-contact-item"><i data-lucide="mail" style="width: 11px; height: 11px;"></i>${contact.email}</span>` : '',
+    contact.phone ? `<span class="cv-contact-item"><i data-lucide="phone" style="width: 11px; height: 11px;"></i>${contact.phone}</span>` : '',
+    contact.linkedin ? `<span class="cv-contact-item"><i data-lucide="linkedin" style="width: 11px; height: 11px;"></i>${contact.linkedin.replace(/^https?:\/\//, '')}</span>` : '',
+    contact.github ? `<span class="cv-contact-item"><i data-lucide="github" style="width: 11px; height: 11px;"></i>${contact.github.replace(/^https?:\/\//, '')}</span>` : '',
+    contact.portfolio ? `<span class="cv-contact-item"><i data-lucide="globe" style="width: 11px; height: 11px;"></i>${contact.portfolio.replace(/^https?:\/\//, '')}</span>` : ''
+  ].filter(Boolean).join(' • ');
+
+  const skillsHtml = `
+    <div class="cv-skills-grid">
+      ${cv.skillsByCategory?.coreStack ? `<div class="cv-skill-line"><strong>Target Stack:</strong> <span>${cv.skillsByCategory.coreStack.join(', ')}</span></div>` : ''}
+      ${cv.skillsByCategory?.frameworksAndDatabases ? `<div class="cv-skill-line"><strong>Frameworks & Databases:</strong> <span>${cv.skillsByCategory.frameworksAndDatabases.join(', ')}</span></div>` : ''}
+      ${cv.skillsByCategory?.toolsAndDevOps ? `<div class="cv-skill-line"><strong>Engineering Practices & Tools:</strong> <span>${cv.skillsByCategory.toolsAndDevOps.join(', ')}</span></div>` : ''}
+    </div>
+  `;
+
+  const experienceHtml = (cv.experience || []).map(exp => `
+    <div class="cv-job-entry">
+      <div class="cv-job-header">
+        <div>
+          <span class="cv-job-title">${exp.role}</span>
+          <span style="color: var(--text-muted); margin: 0 4px;">•</span>
+          <span class="cv-job-company">${exp.company}</span>
+        </div>
+        <span class="cv-job-period">${exp.period}</span>
+      </div>
+      <ul class="cv-bullet-list">
+        ${(exp.bullets || []).map(b => `<li>${b}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('');
+
+  const projectsHtml = (cv.projects || []).map(p => `
+    <div class="cv-job-entry">
+      <div class="cv-job-header">
+        <div>
+          <span class="cv-job-title">${p.name}</span>
+          ${p.techStack ? `<span style="color: var(--text-muted); margin: 0 4px;">|</span><span style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-primary);">${p.techStack}</span>` : ''}
+        </div>
+      </div>
+      ${p.description ? `<p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 4px 0;">${p.description}</p>` : ''}
+      <ul class="cv-bullet-list">
+        ${(p.bullets || []).map(b => `<li>${b}</li>`).join('')}
+      </ul>
+    </div>
+  `).join('');
+
+  const educationHtml = (cv.education || []).map(edu => `
+    <div style="font-size: 12px; margin-bottom: 4px; display: flex; justify-content: space-between;">
+      <div>
+        <strong>${edu.degree}</strong>, <span style="color: var(--text-secondary);">${edu.institution}</span>
+      </div>
+      <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${edu.year || ''}</span>
+    </div>
+  `).join('');
+
+  paper.innerHTML = `
+    <div class="cv-header-block">
+      <h1 class="cv-candidate-name">${cv.candidateName}</h1>
+      <div class="cv-targeted-role">${cv.targetedTitle}</div>
+      <div class="cv-contact-row">${contactParts}</div>
+    </div>
+
+    <div class="cv-section">
+      <div class="cv-section-title">Professional Summary</div>
+      <p class="cv-summary-text">${cv.summary}</p>
+    </div>
+
+    <div class="cv-section">
+      <div class="cv-section-title">Core Competencies & Technical Skills</div>
+      ${skillsHtml}
+    </div>
+
+    <div class="cv-section">
+      <div class="cv-section-title">Targeted Experience</div>
+      ${experienceHtml}
+    </div>
+
+    ${cv.projects && cv.projects.length > 0 ? `
+    <div class="cv-section">
+      <div class="cv-section-title">Relevant Projects</div>
+      ${projectsHtml}
+    </div>
+    ` : ''}
+
+    ${cv.education && cv.education.length > 0 ? `
+    <div class="cv-section">
+      <div class="cv-section-title">Education & Certifications</div>
+      ${educationHtml}
+    </div>
+    ` : ''}
+
+    ${cv.atsMatchKeywords && cv.atsMatchKeywords.length > 0 ? `
+    <div style="margin-top: 14px; padding-top: 8px; border-top: 1px dashed var(--border-subtle); font-size: 10.5px; font-family: var(--font-mono); color: var(--text-muted);">
+      <strong>ATS Targeted Keywords:</strong> ${cv.atsMatchKeywords.join(', ')}
+    </div>
+    ` : ''}
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+
+function copyTailoredCvMarkdown() {
+  const cv = state.activeTailoredCv;
+  if (!cv || !cv.markdown) {
+    const paper = document.getElementById('tailored-cv-paper');
+    if (paper) {
+      navigator.clipboard.writeText(paper.innerText);
+      showToast('Copied CV text to clipboard', 'check');
+    }
+    return;
+  }
+  navigator.clipboard.writeText(cv.markdown);
+  showToast('Copied Tailored CV (Markdown) to clipboard', 'check');
+}
+
+function printTailoredCv() {
+  window.print();
 }
 
 // ==================== KANBAN APPLICATION PIPELINE ====================
