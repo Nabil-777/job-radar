@@ -1,0 +1,22 @@
+import adapter from '@sveltejs/adapter-auto';
+import tailwindcss from '@tailwindcss/vite';
+import { sveltekit } from '@sveltejs/kit/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+	plugins: [
+		tailwindcss(),
+		sveltekit({
+			adapter: adapter()
+		})
+	],
+	server: {
+		port: 5173,
+		proxy: {
+			'/api': {
+				target: 'http://localhost:4000',
+				changeOrigin: true
+			}
+		}
+	}
+});

@@ -1,0 +1,79 @@
+@import "@fontsource/geist-sans/400.css";
+@import "@fontsource/geist-sans/500.css";
+@import "@fontsource/geist-sans/600.css";
+@import "@fontsource/geist-mono/400.css";
+@import "@fontsource/geist-mono/500.css";
+
+@import "tailwindcss";
+
+@theme {
+  /* Fonts — imposed */
+  --font-sans: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", monospace;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, serif;
+
+  /* Brand */
+  --color-brand-50: oklch(0.97 0.02 275);
+  --color-brand-500: oklch(0.60 0.20 275); /* #6366f1 */
+  --color-brand-600: oklch(0.54 0.22 275);
+  --color-brand-700: oklch(0.48 0.22 275);
+
+  /* Neutrals — zinc only */
+  --color-surface-1: oklch(0.99 0 0);
+  --color-surface-2: oklch(0.97 0 0);
+  --color-surface-3: oklch(0.94 0 0);
+  --color-border: oklch(0.90 0 0);
+  --color-text-1: oklch(0.15 0 0);
+  --color-text-2: oklch(0.40 0 0);
+  --color-text-3: oklch(0.60 0 0);
+
+  /* Radii — sharp, not bubbly */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+/* Dark mode — the default */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface-1: oklch(0.13 0 0);
+    --color-surface-2: oklch(0.16 0 0);
+    --color-surface-3: oklch(0.20 0 0);
+    --color-border: oklch(0.25 0 0);
+    --color-text-1: oklch(0.97 0 0);
+    --color-text-2: oklch(0.70 0 0);
+    --color-text-3: oklch(0.50 0 0);
+  }
+}
+
+:root:has(.dark),
+html.dark {
+  --color-surface-1: oklch(0.13 0 0);
+  --color-surface-2: oklch(0.16 0 0);
+  --color-surface-3: oklch(0.20 0 0);
+  --color-border: oklch(0.25 0 0);
+  --color-text-1: oklch(0.97 0 0);
+  --color-text-2: oklch(0.70 0 0);
+  --color-text-3: oklch(0.50 0 0);
+}
+
+html {
+  font-family: var(--font-sans);
+  font-size: 100%;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Tabular numbers on everything that changes */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.tracking-tight {
+  letter-spacing: -0.01em;
+}
+
+.tracking-tighter {
+  letter-spacing: -0.02em;
+}
