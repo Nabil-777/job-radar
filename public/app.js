@@ -286,8 +286,11 @@ function handleLogout() {
   localStorage.removeItem('jobradar_token');
   showToast('Signed out successfully', 'log-out');
   renderAuthWidgets();
+  closeDrawer();
+  switchView('jobs');
   loadUserProfile();
   loadApplications();
+  triggerSearch();
 }
 
 // ==================== THEME CONTROLLER ====================
