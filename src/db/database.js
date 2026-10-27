@@ -88,6 +88,7 @@ function initSchema() {
       experience_summary TEXT,
       education_summary TEXT,
       raw_cv_text TEXT,
+      structured_cv_json TEXT,
       preferred_domains_json TEXT,
       preferred_locations_json TEXT,
       updated_at TEXT
@@ -122,6 +123,10 @@ function initSchema() {
 
   try {
     db.prepare("ALTER TABLE user_profile ADD COLUMN user_id TEXT DEFAULT 'default'").run();
+  } catch (e) {}
+
+  try {
+    db.prepare("ALTER TABLE user_profile ADD COLUMN structured_cv_json TEXT").run();
   } catch (e) {}
 
   // Safe index creation

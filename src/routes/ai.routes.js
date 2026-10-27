@@ -2,6 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const { db } = require('../db/database');
 const { generateAIPitch, generateTailoredCV } = require('../services/aiService');
+const { generateTailoredResume } = require('../services/cvGeneratorService');
 const { optionalAuth } = require('../middleware/auth.middleware');
 
 const router = express.Router();
@@ -19,7 +20,8 @@ const pitchRequestSchema = z.object({
   jobTitle: z.string().optional(),
   company: z.string().optional(),
   location: z.string().optional(),
-  language: z.string().optional().default('English'),
+  language: z.string().optional().default('auto'),
+  template: z.enum(['jake-ats', 'morocco-pfe', 'modern-split']).optional().default('jake-ats'),
   customNotes: z.string().optional()
 });
 
@@ -32,7 +34,7 @@ function getCandidateProfile(userId) {
   };
 }
 
-// POST /api/ai/pitch & /api/ai/cover-letter
+// POST /api/ai/pitch
 router.post('/pitch', async (req, res) => {
   try {
     const body = pitchRequestSchema.parse(req.body);
@@ -62,7 +64,7 @@ router.post('/pitch', async (req, res) => {
   }
 });
 
-// POST /api/ai/tailored-cv (Tailored CV Generator for each opportunity)
+// POST /api/ai/tailored-cv (Fact-Preserving ATS-Optimized A4 Resume Generator)
 router.post('/tailored-cv', async (req, res) => {
   try {
     const body = pitchRequestSchema.parse(req.body);
@@ -76,21 +78,55 @@ router.post('/tailored-cv', async (req, res) => {
     const userId = req.user?.id || 'default';
     const profile = getCandidateProfile(userId);
 
-    const tailoredCv = await generateTailoredCV({
+    const result = await generateTailoredResume({
       job,
       profile,
-      language: body.language || 'English',
+      language: body.language || 'auto',
+      template: body.template || 'jake-ats',
       customNotes: body.customNotes || ''
     });
 
     res.json({
       success: true,
-      tailoredCv
+      targetLanguage: result.targetLanguage,
+      template: result.template,
+      tailoredResumeJson: result.tailoredResumeJson,
+      atsAnalysis: result.atsAnalysis,
+      renderedHtml: result.renderedHtml,
+      markdown: result.markdown,
+      // Backward compatibility object
+      tailoredCv: {
+        success: true,
+        candidateName: result.tailoredResumeJson.basics.fullName,
+        targetedTitle: result.tailoredResumeJson.basics.headline,
+        summary: result.tailoredResumeJson.basics.summary,
+        markdown: result.markdown,
+        matchScore: result.atsAnalysis.score,
+        matchedSkills: result.atsAnalysis.matchedKeywords,
+        missingSkills: result.atsAnalysis.missingKeywords,
+        contact: {
+          email: result.tailoredResumeJson.basics.email,
+          phone: result.tailoredResumeJson.basics.phone,
+          location: result.tailoredResumeJson.basics.location
+        },
+        skillsByCategory: {
+          coreStack: result.tailoredResumeJson.skills.languages,
+          frameworksAndDatabases: [
+            ...(result.tailoredResumeJson.skills.frameworks || []),
+            ...(result.tailoredResumeJson.skills.databases || [])
+          ],
+          toolsAndDevOps: result.tailoredResumeJson.skills.cloudDevOps
+        },
+        experience: result.tailoredResumeJson.workExperience,
+        projects: result.tailoredResumeJson.projects,
+        education: result.tailoredResumeJson.education
+      }
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ success: false, error: err.issues.map(e => e.message).join(', ') });
     }
+    console.error('[Tailored CV Route Error]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

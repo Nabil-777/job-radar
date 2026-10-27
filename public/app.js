@@ -14,14 +14,17 @@ const state = {
   filteredJobs: [],
   applications: [],
   profile: null,
+  structuredCv: null,
   health: null,
   customProviders: [],
   selectedIndex: -1,             // Keyboard focused job index
   activeDrawerJob: null,         // Currently inspected job in right slide-over
   activePitchMode: 'letter',     // 'letter' | 'linkedin' | 'cold' | 'tips' | 'cv'
   pitchDataCache: {},            // Cache generated pitches by jobId
-  tailoredCvCache: {},           // Cache tailored CVs by jobId_language
+  tailoredCvCache: {},           // Cache tailored CVs by jobId_template_language
   activeTailoredCv: null,
+  activeTailoredCvResult: null,
+  studioZoom: 1.0,
   theme: localStorage.getItem('jobradar_theme') || 'dark'
 };
 
@@ -1077,6 +1080,22 @@ function openDrawerMailto() {
   window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
 }
 
+// Helper String Escapers
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function escapeJs(str) {
+  if (!str) return '';
+  return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+}
+
 // ==================== TAILORED CV STUDIO & EXPORT SYSTEM ====================
 async function openTailoredCvModal() {
   const job = state.activeDrawerJob;
@@ -1088,25 +1107,28 @@ async function openTailoredCvModal() {
   const modal = document.getElementById('modal-tailored-cv');
   const titleEl = document.getElementById('cv-modal-title');
   const subEl = document.getElementById('cv-modal-subtitle');
-  const lang = document.getElementById('cv-modal-lang').value;
+  const templateSelect = document.getElementById('studio-template-select');
+  const langSelect = document.getElementById('cv-modal-lang');
   const paper = document.getElementById('tailored-cv-paper');
+
+  const template = templateSelect ? templateSelect.value : 'jake-ats';
+  const lang = langSelect ? langSelect.value : 'auto';
 
   titleEl.textContent = `Tailored CV — ${job.title}`;
   subEl.textContent = `Target: ${job.company} • ${job.location || 'Morocco / Remote'}`;
   modal.classList.add('open');
 
-  const cacheKey = `${job.id}_${lang}`;
+  const cacheKey = `${job.id}_${template}_${lang}`;
   if (state.tailoredCvCache[cacheKey]) {
-    state.activeTailoredCv = state.tailoredCvCache[cacheKey];
-    renderTailoredCvPaper(state.tailoredCvCache[cacheKey]);
+    renderStudioCvResult(state.tailoredCvCache[cacheKey]);
     return;
   }
 
   paper.innerHTML = `
     <div style="padding: 48px; text-align: center; color: var(--text-muted); font-family: var(--font-mono);">
       <i data-lucide="sparkles" style="width: 28px; height: 28px; margin: 0 auto 12px; color: var(--accent-primary); animation: pulse-beacon 1.5s infinite;"></i>
-      <p style="font-size: 13.5px; color: var(--text-primary); font-weight: 500;">Analyzing opportunity & tailoring ATS resume...</p>
-      <p style="font-size: 11.5px; margin-top: 4px; color: var(--text-muted);">Matching your skills, reordering competencies, and generating quantifiable impact bullets.</p>
+      <p style="font-size: 13.5px; color: var(--text-primary); font-weight: 500;">Analyzing opportunity & crafting ATS resume...</p>
+      <p style="font-size: 11.5px; margin-top: 4px; color: var(--text-muted);">Reordering competencies, framing action verbs, and validating factual fit without hallucination.</p>
     </div>
   `;
   if (window.lucide) lucide.createIcons();
@@ -1124,14 +1146,16 @@ async function regenerateTailoredCv() {
   const job = state.activeDrawerJob;
   if (!job) return;
 
-  const lang = document.getElementById('cv-modal-lang').value;
+  const templateSelect = document.getElementById('studio-template-select');
+  const langSelect = document.getElementById('cv-modal-lang');
+  const template = templateSelect ? templateSelect.value : 'jake-ats';
+  const lang = langSelect ? langSelect.value : 'auto';
   const paper = document.getElementById('tailored-cv-paper');
-  const badge = document.getElementById('cv-ats-badge');
 
   paper.innerHTML = `
     <div style="padding: 48px; text-align: center; color: var(--text-muted); font-family: var(--font-mono);">
       <i data-lucide="sparkles" style="width: 28px; height: 28px; margin: 0 auto 12px; color: var(--accent-primary); animation: pulse-beacon 1.5s infinite;"></i>
-      <p style="font-size: 13.5px; color: var(--text-primary); font-weight: 500;">Tailoring CV for ${job.company} (${lang})...</p>
+      <p style="font-size: 13.5px; color: var(--text-primary); font-weight: 500;">Tailoring CV for ${job.company} (${template} • ${lang.toUpperCase()})...</p>
     </div>
   `;
   if (window.lucide) lucide.createIcons();
@@ -1140,149 +1164,263 @@ async function regenerateTailoredCv() {
     const res = await fetch('/api/ai/tailored-cv', {
       method: 'POST',
       headers: getAuthHeaders(true),
-      body: JSON.stringify({ job, language: lang })
+      body: JSON.stringify({ job, language: lang, template })
     });
     const data = await res.json();
-    if (data.success && data.tailoredCv) {
-      const cacheKey = `${job.id}_${lang}`;
-      state.tailoredCvCache[cacheKey] = data.tailoredCv;
-      state.activeTailoredCv = data.tailoredCv;
-      if (badge && data.tailoredCv.matchScore) {
-        badge.textContent = `${data.tailoredCv.matchScore}% ATS Alignment`;
-      }
-      renderTailoredCvPaper(data.tailoredCv);
+    if (data.success && data.renderedHtml) {
+      const cacheKey = `${job.id}_${template}_${lang}`;
+      state.tailoredCvCache[cacheKey] = data;
+      renderStudioCvResult(data);
     } else {
-      paper.innerHTML = `<div style="color: var(--danger-fg); padding: 24px;">Failed to generate tailored CV. Please verify connection.</div>`;
+      paper.innerHTML = `<div style="color: var(--danger-fg); padding: 24px; text-align: center;">${data.error || 'Failed to generate tailored CV. Please verify profile data.'}</div>`;
     }
   } catch (err) {
-    paper.innerHTML = `<div style="color: var(--danger-fg); padding: 24px;">Error: ${err.message}</div>`;
+    paper.innerHTML = `<div style="color: var(--danger-fg); padding: 24px; text-align: center;">Error: ${err.message}</div>`;
   }
 }
 
-function renderTailoredCvPaper(cv) {
+function renderStudioCvResult(data) {
+  state.activeTailoredCvResult = data;
+  state.activeTailoredCv = data.tailoredCv || { markdown: data.markdown };
+
+  const ats = data.atsAnalysis || {};
+  const score = Math.round(ats.score || 50);
+
+  // Update ATS Badges
+  const badge = document.getElementById('cv-ats-badge');
+  if (badge) badge.textContent = `${score}% ATS Alignment`;
+
+  const studioScore = document.getElementById('studio-ats-score');
+  if (studioScore) {
+    studioScore.textContent = `${score}%`;
+    studioScore.style.color = score >= 75 ? 'var(--match-high-fg)' : (score >= 50 ? 'var(--match-med-fg)' : 'var(--match-low-fg)');
+  }
+
+  // Matched Keywords
+  const matchedEl = document.getElementById('studio-matched-chips');
+  if (matchedEl) {
+    const matched = ats.matchedKeywords || [];
+    matchedEl.innerHTML = matched.length
+      ? matched.map(k => `<span class="tech-pill matched" style="font-size: 10.5px;">✓ ${escapeHtml(k)}</span>`).join('')
+      : '<span style="font-size: 10.5px; color: var(--text-muted);">None detected yet</span>';
+  }
+
+  // Missing Keywords with Click-to-Inject
+  const missingEl = document.getElementById('studio-missing-chips');
+  if (missingEl) {
+    const missing = ats.missingKeywords || [];
+    missingEl.innerHTML = missing.length
+      ? missing.map(k => `
+        <button type="button" onclick="injectKeywordToCv('${escapeJs(k)}')" class="tech-pill" style="font-size: 10.5px; cursor: pointer; border-style: dashed; background: transparent; color: var(--text-secondary); transition: all 120ms ease;" title="Click to inject into skills matrix">
+          + ${escapeHtml(k)}
+        </button>
+      `).join('')
+      : '<span style="font-size: 10.5px; color: var(--match-high-fg);">✓ 100% Core Keywords Covered!</span>';
+  }
+
+  // Render HTML Sheet directly to paper
   const paper = document.getElementById('tailored-cv-paper');
-  if (!paper) return;
+  if (paper) {
+    paper.innerHTML = data.renderedHtml || '';
+    // Apply current section toggle states
+    ['summary', 'skills', 'experience', 'projects', 'education', 'languages'].forEach(sec => {
+      toggleCvSection(sec);
+    });
+  }
 
-  const contact = cv.contact || {};
-  const contactParts = [
-    contact.location ? `<span class="cv-contact-item"><i data-lucide="map-pin" style="width: 11px; height: 11px;"></i>${contact.location}</span>` : '',
-    contact.email ? `<span class="cv-contact-item"><i data-lucide="mail" style="width: 11px; height: 11px;"></i>${contact.email}</span>` : '',
-    contact.phone ? `<span class="cv-contact-item"><i data-lucide="phone" style="width: 11px; height: 11px;"></i>${contact.phone}</span>` : '',
-    contact.linkedin ? `<span class="cv-contact-item"><i data-lucide="linkedin" style="width: 11px; height: 11px;"></i>${contact.linkedin.replace(/^https?:\/\//, '')}</span>` : '',
-    contact.github ? `<span class="cv-contact-item"><i data-lucide="github" style="width: 11px; height: 11px;"></i>${contact.github.replace(/^https?:\/\//, '')}</span>` : '',
-    contact.portfolio ? `<span class="cv-contact-item"><i data-lucide="globe" style="width: 11px; height: 11px;"></i>${contact.portfolio.replace(/^https?:\/\//, '')}</span>` : ''
-  ].filter(Boolean).join(' • ');
-
-  const skillsHtml = `
-    <div class="cv-skills-grid">
-      ${cv.skillsByCategory?.coreStack ? `<div class="cv-skill-line"><strong>Target Stack:</strong> <span>${cv.skillsByCategory.coreStack.join(', ')}</span></div>` : ''}
-      ${cv.skillsByCategory?.frameworksAndDatabases ? `<div class="cv-skill-line"><strong>Frameworks & Databases:</strong> <span>${cv.skillsByCategory.frameworksAndDatabases.join(', ')}</span></div>` : ''}
-      ${cv.skillsByCategory?.toolsAndDevOps ? `<div class="cv-skill-line"><strong>Engineering Practices & Tools:</strong> <span>${cv.skillsByCategory.toolsAndDevOps.join(', ')}</span></div>` : ''}
-    </div>
-  `;
-
-  const experienceHtml = (cv.experience || []).map(exp => `
-    <div class="cv-job-entry">
-      <div class="cv-job-header">
-        <div>
-          <span class="cv-job-title">${exp.role}</span>
-          <span style="color: var(--text-muted); margin: 0 4px;">•</span>
-          <span class="cv-job-company">${exp.company}</span>
-        </div>
-        <span class="cv-job-period">${exp.period}</span>
-      </div>
-      <ul class="cv-bullet-list">
-        ${(exp.bullets || []).map(b => `<li>${b}</li>`).join('')}
-      </ul>
-    </div>
-  `).join('');
-
-  const projectsHtml = (cv.projects || []).map(p => `
-    <div class="cv-job-entry">
-      <div class="cv-job-header">
-        <div>
-          <span class="cv-job-title">${p.name}</span>
-          ${p.techStack ? `<span style="color: var(--text-muted); margin: 0 4px;">|</span><span style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-primary);">${p.techStack}</span>` : ''}
-        </div>
-      </div>
-      ${p.description ? `<p style="font-size: 12px; color: var(--text-secondary); margin: 2px 0 4px 0;">${p.description}</p>` : ''}
-      <ul class="cv-bullet-list">
-        ${(p.bullets || []).map(b => `<li>${b}</li>`).join('')}
-      </ul>
-    </div>
-  `).join('');
-
-  const educationHtml = (cv.education || []).map(edu => `
-    <div style="font-size: 12px; margin-bottom: 4px; display: flex; justify-content: space-between;">
-      <div>
-        <strong>${edu.degree}</strong>, <span style="color: var(--text-secondary);">${edu.institution}</span>
-      </div>
-      <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${edu.year || ''}</span>
-    </div>
-  `).join('');
-
-  paper.innerHTML = `
-    <div class="cv-header-block">
-      <h1 class="cv-candidate-name">${cv.candidateName}</h1>
-      <div class="cv-targeted-role">${cv.targetedTitle}</div>
-      <div class="cv-contact-row">${contactParts}</div>
-    </div>
-
-    <div class="cv-section">
-      <div class="cv-section-title">Professional Summary</div>
-      <p class="cv-summary-text">${cv.summary}</p>
-    </div>
-
-    <div class="cv-section">
-      <div class="cv-section-title">Core Competencies & Technical Skills</div>
-      ${skillsHtml}
-    </div>
-
-    <div class="cv-section">
-      <div class="cv-section-title">Targeted Experience</div>
-      ${experienceHtml}
-    </div>
-
-    ${cv.projects && cv.projects.length > 0 ? `
-    <div class="cv-section">
-      <div class="cv-section-title">Relevant Projects</div>
-      ${projectsHtml}
-    </div>
-    ` : ''}
-
-    ${cv.education && cv.education.length > 0 ? `
-    <div class="cv-section">
-      <div class="cv-section-title">Education & Certifications</div>
-      ${educationHtml}
-    </div>
-    ` : ''}
-
-    ${cv.atsMatchKeywords && cv.atsMatchKeywords.length > 0 ? `
-    <div style="margin-top: 14px; padding-top: 8px; border-top: 1px dashed var(--border-subtle); font-size: 10.5px; font-family: var(--font-mono); color: var(--text-muted);">
-      <strong>ATS Targeted Keywords:</strong> ${cv.atsMatchKeywords.join(', ')}
-    </div>
-    ` : ''}
-  `;
+  // Restore active zoom
+  setStudioZoom(state.studioZoom);
 
   if (window.lucide) lucide.createIcons();
 }
 
-function copyTailoredCvMarkdown() {
-  const cv = state.activeTailoredCv;
-  if (!cv || !cv.markdown) {
-    const paper = document.getElementById('tailored-cv-paper');
-    if (paper) {
-      navigator.clipboard.writeText(paper.innerText);
-      showToast('Copied CV text to clipboard', 'check');
+// Click to inject missing ATS keyword into the rendered resume
+function injectKeywordToCv(keyword) {
+  const paper = document.getElementById('tailored-cv-paper');
+  if (!paper) return;
+
+  // Search for skill section
+  const skillSec = paper.querySelector('[data-section="skills"]');
+  if (skillSec) {
+    const catDivs = skillSec.querySelectorAll('.cv-skill-grid > div:not(.cv-skill-cat)');
+    if (catDivs.length > 0) {
+      const targetDiv = catDivs[1] || catDivs[0];
+      targetDiv.innerHTML += `, <strong style="font-weight: 600; color: #1E3A8A; background: #DBEAFE; padding: 1px 4px; border-radius: 2px;">${escapeHtml(keyword)}</strong>`;
+    } else {
+      skillSec.innerHTML += ` <span style="font-weight: 600; color: #1E3A8A; background: #DBEAFE; padding: 1px 4px; border-radius: 2px;">${escapeHtml(keyword)}</span>`;
     }
+  }
+
+  // Move chip from missing to matched
+  const missingContainer = document.getElementById('studio-missing-chips');
+  const matchedContainer = document.getElementById('studio-matched-chips');
+  if (missingContainer && matchedContainer) {
+    const btns = Array.from(missingContainer.querySelectorAll('button'));
+    const targetBtn = btns.find(b => b.textContent.includes(keyword));
+    if (targetBtn) targetBtn.remove();
+
+    const chip = document.createElement('span');
+    chip.className = 'tech-pill matched';
+    chip.style.fontSize = '10.5px';
+    chip.textContent = `✓ ${keyword}`;
+    matchedContainer.appendChild(chip);
+
+    const scoreEl = document.getElementById('studio-ats-score');
+    if (scoreEl) {
+      const cur = parseInt(scoreEl.textContent, 10) || 50;
+      const next = Math.min(100, cur + 5);
+      scoreEl.textContent = `${next}%`;
+      const badge = document.getElementById('cv-ats-badge');
+      if (badge) badge.textContent = `${next}% ATS Alignment`;
+    }
+  }
+
+  showToast(`Injected "${keyword}" into Resume skills`, 'check');
+}
+
+// Toggle individual section visibility to guarantee clean 1-page fit
+function toggleCvSection(sectionId) {
+  const checkbox = document.getElementById(`toggle-sec-${sectionId}`);
+  const isChecked = checkbox ? checkbox.checked : true;
+  const sections = document.querySelectorAll(`#tailored-cv-paper [data-section="${sectionId}"]`);
+  sections.forEach(s => {
+    s.style.display = isChecked ? '' : 'none';
+  });
+}
+
+// Studio A4 Canvas Zoom Controls
+function setStudioZoom(scale) {
+  state.studioZoom = scale;
+  const viewport = document.getElementById('tailored-cv-viewport');
+  if (viewport) {
+    viewport.style.transform = scale === 1.0 ? 'none' : `scale(${scale})`;
+    viewport.style.transformOrigin = 'top center';
+  }
+
+  // Update button active states
+  const zButtons = document.querySelectorAll('button[onclick^="setStudioZoom"]');
+  zButtons.forEach(btn => {
+    const text = btn.textContent.trim();
+    if ((scale === 0.75 && text === '75%') ||
+        (scale === 0.9 && text === '90%') ||
+        (scale === 1.0 && text === '100%')) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+// True Vector A4 PDF Export (Print-engine vector rendering via hidden iframe)
+function exportCvToPdf() {
+  const paper = document.getElementById('tailored-cv-paper');
+  if (!paper) {
+    showToast('No resume content to export', 'alert-circle');
     return;
   }
-  navigator.clipboard.writeText(cv.markdown);
-  showToast('Copied Tailored CV (Markdown) to clipboard', 'check');
+
+  let iframe = document.getElementById('cv-print-iframe');
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.id = 'cv-print-iframe';
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+  }
+
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  const candidateName = state.activeTailoredCvResult?.tailoredResumeJson?.basics?.fullName || 'Candidate';
+  const roleName = state.activeDrawerJob?.title || 'Tech';
+
+  doc.open();
+  doc.write(`
+    <!DOCTYPE html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>${candidateName} — ${roleName} (CV)</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            margin: 0;
+            padding: 0;
+            background: #ffffff !important;
+            color: #0F172A;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          @page {
+            size: A4 portrait;
+            margin: 10mm 12mm;
+          }
+          .cv-a4-sheet {
+            box-shadow: none !important;
+            margin: 0 !important;
+            width: 100% !important;
+            min-height: auto !important;
+            padding: 0 !important;
+          }
+        </style>
+      </head>
+      <body>
+        ${paper.innerHTML}
+      </body>
+    </html>
+  `);
+  doc.close();
+
+  setTimeout(() => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (e) {
+      console.warn('iframe printing error, fallback to window.print', e);
+      window.print();
+    }
+  }, 350);
+}
+
+// Export structured JSON resume standard
+function exportCvJson() {
+  const resumeJson = state.activeTailoredCvResult?.tailoredResumeJson || state.structuredCv;
+  if (!resumeJson) {
+    showToast('No structured resume found to export', 'alert-circle');
+    return;
+  }
+  const blob = new Blob([JSON.stringify(resumeJson, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const name = (resumeJson.basics?.fullName || 'resume').toLowerCase().replace(/\s+/g, '_');
+  a.href = url;
+  a.download = `${name}_ats_resume.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Exported JSON Resume', 'check');
+}
+
+function copyTailoredCvMarkdown() {
+  const result = state.activeTailoredCvResult;
+  if (result && result.markdown) {
+    navigator.clipboard.writeText(result.markdown);
+    showToast('Copied Tailored CV (Markdown) to clipboard', 'check');
+    return;
+  }
+  const paper = document.getElementById('tailored-cv-paper');
+  if (paper) {
+    navigator.clipboard.writeText(paper.innerText);
+    showToast('Copied resume text to clipboard', 'check');
+  }
 }
 
 function printTailoredCv() {
-  window.print();
+  exportCvToPdf();
 }
 
 // ==================== KANBAN APPLICATION PIPELINE ====================
@@ -1504,7 +1642,7 @@ async function handleCvUpload(e) {
   if (!file) return;
 
   const statusEl = document.getElementById('cv-upload-status');
-  if (statusEl) statusEl.innerHTML = `<span style="color: var(--accent-primary);">Extracting skills with PDF parser...</span>`;
+  if (statusEl) statusEl.innerHTML = `<span style="color: var(--accent-primary);">Analyzing layout & parsing structured resume...</span>`;
 
   const formData = new FormData();
   formData.append('cv', file);
@@ -1517,8 +1655,15 @@ async function handleCvUpload(e) {
     });
     const data = await res.json();
     if (data.success) {
-      if (statusEl) statusEl.innerHTML = `<span style="color: var(--match-high-fg);">✓ Parsed ${data.detectedSkills.length} skills successfully!</span>`;
-      showToast(`Parsed ${data.detectedSkills.length} skills from resume`, 'file-check');
+      const skillsCount = (data.detectedSkills && data.detectedSkills.length) || 0;
+      if (statusEl) statusEl.innerHTML = `<span style="color: var(--match-high-fg);">✓ Coordinate-aware extraction complete! ${skillsCount} skills identified.</span>`;
+      showToast(`Parsed ${skillsCount} skills & structured resume`, 'file-check');
+
+      if (data.structuredCv) {
+        state.structuredCv = data.structuredCv;
+        renderStructuredCvEditor(data.structuredCv);
+      }
+
       await loadUserProfile();
       triggerSearch();
     } else {
@@ -1544,8 +1689,401 @@ async function loadUserProfile() {
       document.getElementById('prof-phone').value = data.profile.phone || '';
       document.getElementById('prof-portfolio').value = data.profile.portfolioUrl || '';
       document.getElementById('prof-skills').value = data.profile.skills || '';
+
+      if (data.profile.structuredCv) {
+        state.structuredCv = data.profile.structuredCv;
+        renderStructuredCvEditor(data.profile.structuredCv);
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('Failed to load user profile:', e);
+  }
+}
+
+// Render Structured Resume Review & Editor
+function renderStructuredCvEditor(cv) {
+  if (!cv) return;
+  state.structuredCv = cv;
+
+  const card = document.getElementById('structured-cv-review-card');
+  const body = document.getElementById('structured-cv-editor-body');
+  if (!card || !body) return;
+
+  card.style.display = 'block';
+
+  const expList = cv.workExperience || [];
+  const projList = cv.projects || [];
+  const eduList = cv.education || [];
+  const sk = cv.skills || {};
+  const langList = cv.spokenLanguages || [];
+
+  body.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <!-- Professional Summary -->
+      <div>
+        <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">
+          Candidate Summary
+        </label>
+        <textarea id="scv-summary" rows="3" class="pitch-textarea" style="height: 65px; font-size: 11.5px;" placeholder="Professional summary extracted from resume...">${escapeHtml(cv.basics?.summary || '')}</textarea>
+      </div>
+
+      <!-- Work Experience & Internships -->
+      <div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">
+            Work Experience & Internships (${expList.length})
+          </label>
+          <button type="button" onclick="addCvExperienceItem()" class="btn-action-icon" style="width: auto; padding: 0 8px; font-size: 11px; height: 24px; gap: 4px;">
+            <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
+            <span>Add Experience</span>
+          </button>
+        </div>
+        <div id="scv-exp-container" style="display: flex; flex-direction: column; gap: 10px;">
+          ${expList.map((exp, idx) => `
+            <div class="scv-exp-item" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; position: relative;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 11px; font-weight: 600; color: var(--accent-primary);">Experience #${idx + 1}</span>
+                <button type="button" onclick="removeCvItem(this)" class="btn-action-icon" style="width: 22px; height: 22px; color: var(--danger-fg);" title="Delete entry">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                </button>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 110px; gap: 8px; margin-bottom: 8px;">
+                <input type="text" class="scv-exp-role search-input" placeholder="Role / Title" value="${escapeHtml(exp.role || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+                <input type="text" class="scv-exp-company search-input" placeholder="Company" value="${escapeHtml(exp.company || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+                <input type="text" class="scv-exp-contract search-input" placeholder="Contract (e.g. Stage/CDI)" value="${escapeHtml(exp.contractType || 'Stage')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <input type="text" class="scv-exp-location search-input" placeholder="Location" value="${escapeHtml(exp.location || 'Morocco')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+                <input type="text" class="scv-exp-start search-input" placeholder="Start Date" value="${escapeHtml(exp.startDate || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+                <input type="text" class="scv-exp-end search-input" placeholder="End Date (or Present)" value="${escapeHtml(exp.endDate || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+              </div>
+              <input type="text" class="scv-exp-tech search-input" placeholder="Technologies used (comma separated)" value="${escapeHtml((exp.technologies || []).join(', '))}" style="padding-left: 8px; height: 30px; font-size: 11.5px; margin-bottom: 8px;">
+              <textarea class="scv-exp-bullets pitch-textarea" rows="3" style="height: 60px; font-size: 11.5px;" placeholder="Bullet points (one per line)">${escapeHtml((exp.bullets || []).join('\n'))}</textarea>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Projects & Realisations -->
+      <div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">
+            Projects & Realisations (${projList.length})
+          </label>
+          <button type="button" onclick="addCvProjectItem()" class="btn-action-icon" style="width: auto; padding: 0 8px; font-size: 11px; height: 24px; gap: 4px;">
+            <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
+            <span>Add Project</span>
+          </button>
+        </div>
+        <div id="scv-proj-container" style="display: flex; flex-direction: column; gap: 10px;">
+          ${projList.map((p, idx) => `
+            <div class="scv-proj-item" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 11px; font-weight: 600; color: var(--accent-primary);">Project #${idx + 1}</span>
+                <button type="button" onclick="removeCvItem(this)" class="btn-action-icon" style="width: 22px; height: 22px; color: var(--danger-fg);" title="Delete entry">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                </button>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+                <input type="text" class="scv-proj-name search-input" placeholder="Project Name" value="${escapeHtml(p.name || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+                <input type="text" class="scv-proj-role search-input" placeholder="Role (e.g. Lead Architect)" value="${escapeHtml(p.role || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+                <input type="url" class="scv-proj-url search-input" placeholder="GitHub / Demo URL" value="${escapeHtml(p.url || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+              </div>
+              <input type="text" class="scv-proj-tech search-input" placeholder="Technologies used (comma separated)" value="${escapeHtml((p.technologies || []).join(', '))}" style="padding-left: 8px; height: 30px; font-size: 11.5px; margin-bottom: 8px;">
+              <textarea class="scv-proj-bullets pitch-textarea" rows="2" style="height: 50px; font-size: 11.5px;" placeholder="Bullet points (one per line)">${escapeHtml((p.bullets || []).join('\n'))}</textarea>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Education & Degrees -->
+      <div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">
+            Education & Degrees (${eduList.length})
+          </label>
+          <button type="button" onclick="addCvEducationItem()" class="btn-action-icon" style="width: auto; padding: 0 8px; font-size: 11px; height: 24px; gap: 4px;">
+            <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
+            <span>Add Education</span>
+          </button>
+        </div>
+        <div id="scv-edu-container" style="display: flex; flex-direction: column; gap: 8px;">
+          ${eduList.map((edu, idx) => `
+            <div class="scv-edu-item" style="background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 11px; font-weight: 600; color: var(--accent-primary);">Degree #${idx + 1}</span>
+                <button type="button" onclick="removeCvItem(this)" class="btn-action-icon" style="width: 22px; height: 22px; color: var(--danger-fg);" title="Delete entry">
+                  <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                </button>
+              </div>
+              <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px; margin-bottom: 6px;">
+                <input type="text" class="scv-edu-degree search-input" placeholder="Degree / Diploma" value="${escapeHtml(edu.degree || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+                <input type="text" class="scv-edu-inst search-input" placeholder="Institution / University" value="${escapeHtml(edu.institution || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                <input type="text" class="scv-edu-loc search-input" placeholder="Location" value="${escapeHtml(edu.location || 'Morocco')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+                <input type="text" class="scv-edu-start search-input" placeholder="Start Year" value="${escapeHtml(edu.startDate || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+                <input type="text" class="scv-edu-end search-input" placeholder="End Year / Promo" value="${escapeHtml(edu.endDate || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Skills Taxonomy Matrix -->
+      <div>
+        <label style="display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;">
+          Categorized Skills Taxonomy
+        </label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="display: block; font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px;">Languages</label>
+            <input type="text" id="scv-skills-lang" class="search-input" value="${escapeHtml((sk.languages || []).join(', '))}" style="padding-left: 8px; height: 30px; font-size: 11px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px;">Frameworks & Libs</label>
+            <input type="text" id="scv-skills-fw" class="search-input" value="${escapeHtml((sk.frameworks || []).join(', '))}" style="padding-left: 8px; height: 30px; font-size: 11px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px;">Databases</label>
+            <input type="text" id="scv-skills-db" class="search-input" value="${escapeHtml((sk.databases || []).join(', '))}" style="padding-left: 8px; height: 30px; font-size: 11px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px;">Cloud, DevOps & Tools</label>
+            <input type="text" id="scv-skills-cloud" class="search-input" value="${escapeHtml((sk.cloudDevOps || []).join(', '))}" style="padding-left: 8px; height: 30px; font-size: 11px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px;">AI, Cyber & Data</label>
+            <input type="text" id="scv-skills-ai" class="search-input" value="${escapeHtml((sk.aiCyberData || []).join(', '))}" style="padding-left: 8px; height: 30px; font-size: 11px;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 10.5px; color: var(--text-muted); margin-bottom: 3px;">Practices & Architecture</label>
+            <input type="text" id="scv-skills-pract" class="search-input" value="${escapeHtml((sk.engineeringPractices || []).join(', '))}" style="padding-left: 8px; height: 30px; font-size: 11px;">
+          </div>
+        </div>
+      </div>
+
+      <!-- Spoken Languages -->
+      <div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <label style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">
+            Spoken Languages
+          </label>
+          <button type="button" onclick="addCvLanguageItem()" class="btn-action-icon" style="width: auto; padding: 0 8px; font-size: 11px; height: 24px; gap: 4px;">
+            <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
+            <span>Add Language</span>
+          </button>
+        </div>
+        <div id="scv-lang-container" style="display: flex; flex-direction: column; gap: 6px;">
+          ${(langList.length ? langList : [{ language: 'Arabic', fluency: 'Native' }, { language: 'French', fluency: 'Courant / C1' }, { language: 'English', fluency: 'Professionnel / B2-C1' }]).map(l => `
+            <div class="scv-lang-item" style="display: flex; align-items: center; gap: 8px;">
+              <input type="text" class="scv-lang-name search-input" placeholder="Language (e.g. French)" value="${escapeHtml(l.language || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px; flex: 1;">
+              <input type="text" class="scv-lang-fluency search-input" placeholder="Fluency (e.g. Courant / B2)" value="${escapeHtml(l.fluency || '')}" style="padding-left: 8px; height: 30px; font-size: 11.5px; flex: 1;">
+              <button type="button" onclick="removeCvItem(this)" class="btn-action-icon" style="width: 26px; height: 26px; color: var(--danger-fg);" title="Delete">
+                <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (window.lucide) lucide.createIcons();
+}
+
+// Helpers to add/remove dynamic entries in structured resume editor
+function removeCvItem(buttonEl) {
+  const container = buttonEl.closest('.scv-exp-item, .scv-proj-item, .scv-edu-item, .scv-lang-item');
+  if (container) container.remove();
+}
+
+function addCvExperienceItem() {
+  const container = document.getElementById('scv-exp-container');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'scv-exp-item';
+  div.style.cssText = 'background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px;';
+  div.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span style="font-size: 11px; font-weight: 600; color: var(--accent-primary);">New Experience</span>
+      <button type="button" onclick="removeCvItem(this)" class="btn-action-icon" style="width: 22px; height: 22px; color: var(--danger-fg);"><i data-lucide="trash-2" style="width: 12px; height: 12px;"></i></button>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 110px; gap: 8px; margin-bottom: 8px;">
+      <input type="text" class="scv-exp-role search-input" placeholder="Role / Title" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+      <input type="text" class="scv-exp-company search-input" placeholder="Company" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+      <input type="text" class="scv-exp-contract search-input" placeholder="Contract (Stage/CDI)" value="Stage" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+      <input type="text" class="scv-exp-location search-input" placeholder="Location" value="Morocco" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+      <input type="text" class="scv-exp-start search-input" placeholder="Start Date" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+      <input type="text" class="scv-exp-end search-input" placeholder="End Date" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+    </div>
+    <input type="text" class="scv-exp-tech search-input" placeholder="Technologies used (comma separated)" style="padding-left: 8px; height: 30px; font-size: 11.5px; margin-bottom: 8px;">
+    <textarea class="scv-exp-bullets pitch-textarea" rows="3" style="height: 60px; font-size: 11.5px;" placeholder="Bullet points (one per line)"></textarea>
+  `;
+  container.appendChild(div);
+  if (window.lucide) lucide.createIcons();
+}
+
+function addCvProjectItem() {
+  const container = document.getElementById('scv-proj-container');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'scv-proj-item';
+  div.style.cssText = 'background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px;';
+  div.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <span style="font-size: 11px; font-weight: 600; color: var(--accent-primary);">New Project</span>
+      <button type="button" onclick="removeCvItem(this)" class="btn-action-icon" style="width: 22px; height: 22px; color: var(--danger-fg);"><i data-lucide="trash-2" style="width: 12px; height: 12px;"></i></button>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+      <input type="text" class="scv-proj-name search-input" placeholder="Project Name" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+      <input type="text" class="scv-proj-role search-input" placeholder="Role (e.g. Lead)" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+      <input type="url" class="scv-proj-url search-input" placeholder="GitHub / Demo URL" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+    </div>
+    <input type="text" class="scv-proj-tech search-input" placeholder="Technologies used (comma separated)" style="padding-left: 8px; height: 30px; font-size: 11.5px; margin-bottom: 8px;">
+    <textarea class="scv-proj-bullets pitch-textarea" rows="2" style="height: 50px; font-size: 11.5px;" placeholder="Bullet points (one per line)"></textarea>
+  `;
+  container.appendChild(div);
+  if (window.lucide) lucide.createIcons();
+}
+
+function addCvEducationItem() {
+  const container = document.getElementById('scv-edu-container');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'scv-edu-item';
+  div.style.cssText = 'background: var(--bg-canvas); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 10px;';
+  div.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+      <span style="font-size: 11px; font-weight: 600; color: var(--accent-primary);">New Degree</span>
+      <button type="button" onclick="removeCvItem(this)" class="btn-action-icon" style="width: 22px; height: 22px; color: var(--danger-fg);"><i data-lucide="trash-2" style="width: 12px; height: 12px;"></i></button>
+    </div>
+    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 8px; margin-bottom: 6px;">
+      <input type="text" class="scv-edu-degree search-input" placeholder="Degree / Diploma" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+      <input type="text" class="scv-edu-inst search-input" placeholder="Institution / University" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+      <input type="text" class="scv-edu-loc search-input" placeholder="Location" value="Morocco" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+      <input type="text" class="scv-edu-start search-input" placeholder="Start Year" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+      <input type="text" class="scv-edu-end search-input" placeholder="End Year / Promo" style="padding-left: 8px; height: 30px; font-size: 11.5px;">
+    </div>
+  `;
+  container.appendChild(div);
+  if (window.lucide) lucide.createIcons();
+}
+
+function addCvLanguageItem() {
+  const container = document.getElementById('scv-lang-container');
+  if (!container) return;
+  const div = document.createElement('div');
+  div.className = 'scv-lang-item';
+  div.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+  div.innerHTML = `
+    <input type="text" class="scv-lang-name search-input" placeholder="Language" style="padding-left: 8px; height: 30px; font-size: 11.5px; flex: 1;">
+    <input type="text" class="scv-lang-fluency search-input" placeholder="Fluency" style="padding-left: 8px; height: 30px; font-size: 11.5px; flex: 1;">
+    <button type="button" onclick="removeCvItem(this)" class="btn-action-icon" style="width: 26px; height: 26px; color: var(--danger-fg);"><i data-lucide="trash-2" style="width: 12px; height: 12px;"></i></button>
+  `;
+  container.appendChild(div);
+  if (window.lucide) lucide.createIcons();
+}
+
+// Scrape editor values and persist to PUT /api/profile/structured-cv
+async function saveStructuredCvFromEditor() {
+  const base = state.structuredCv || {};
+  const splitComma = val => (val || '').split(',').map(s => s.trim()).filter(Boolean);
+
+  // Scrape Experiences
+  const workExperience = Array.from(document.querySelectorAll('.scv-exp-item')).map(el => ({
+    role: el.querySelector('.scv-exp-role')?.value.trim() || '',
+    company: el.querySelector('.scv-exp-company')?.value.trim() || '',
+    contractType: el.querySelector('.scv-exp-contract')?.value.trim() || 'Stage',
+    location: el.querySelector('.scv-exp-location')?.value.trim() || 'Morocco',
+    startDate: el.querySelector('.scv-exp-start')?.value.trim() || '',
+    endDate: el.querySelector('.scv-exp-end')?.value.trim() || '',
+    technologies: splitComma(el.querySelector('.scv-exp-tech')?.value),
+    bullets: (el.querySelector('.scv-exp-bullets')?.value || '')
+      .split('\n')
+      .map(b => b.trim())
+      .filter(Boolean)
+  })).filter(exp => exp.company || exp.role);
+
+  // Scrape Projects
+  const projects = Array.from(document.querySelectorAll('.scv-proj-item')).map(el => ({
+    name: el.querySelector('.scv-proj-name')?.value.trim() || '',
+    role: el.querySelector('.scv-proj-role')?.value.trim() || '',
+    url: el.querySelector('.scv-proj-url')?.value.trim() || '',
+    technologies: splitComma(el.querySelector('.scv-proj-tech')?.value),
+    bullets: (el.querySelector('.scv-proj-bullets')?.value || '')
+      .split('\n')
+      .map(b => b.trim())
+      .filter(Boolean)
+  })).filter(p => p.name);
+
+  // Scrape Education
+  const education = Array.from(document.querySelectorAll('.scv-edu-item')).map(el => ({
+    degree: el.querySelector('.scv-edu-degree')?.value.trim() || '',
+    institution: el.querySelector('.scv-edu-inst')?.value.trim() || '',
+    location: el.querySelector('.scv-edu-loc')?.value.trim() || 'Morocco',
+    startDate: el.querySelector('.scv-edu-start')?.value.trim() || '',
+    endDate: el.querySelector('.scv-edu-end')?.value.trim() || '',
+    highlights: []
+  })).filter(edu => edu.institution || edu.degree);
+
+  // Scrape Skills
+  const skills = {
+    languages: splitComma(document.getElementById('scv-skills-lang')?.value),
+    frameworks: splitComma(document.getElementById('scv-skills-fw')?.value),
+    databases: splitComma(document.getElementById('scv-skills-db')?.value),
+    cloudDevOps: splitComma(document.getElementById('scv-skills-cloud')?.value),
+    aiCyberData: splitComma(document.getElementById('scv-skills-ai')?.value),
+    engineeringPractices: splitComma(document.getElementById('scv-skills-pract')?.value)
+  };
+
+  // Scrape Spoken Languages
+  const spokenLanguages = Array.from(document.querySelectorAll('.scv-lang-item')).map(el => ({
+    language: el.querySelector('.scv-lang-name')?.value.trim() || '',
+    fluency: el.querySelector('.scv-lang-fluency')?.value.trim() || ''
+  })).filter(l => l.language);
+
+  const structuredPayload = {
+    basics: {
+      fullName: document.getElementById('prof-name')?.value.trim() || base.basics?.fullName || 'Candidate',
+      headline: document.getElementById('prof-title')?.value.trim() || base.basics?.headline || 'Engineer',
+      email: document.getElementById('prof-email')?.value.trim() || base.basics?.email || '',
+      phone: document.getElementById('prof-phone')?.value.trim() || base.basics?.phone || '',
+      location: base.basics?.location || 'Morocco',
+      links: base.basics?.links || { linkedin: '', github: '', portfolio: '' },
+      summary: document.getElementById('scv-summary')?.value.trim() || base.basics?.summary || ''
+    },
+    education,
+    workExperience,
+    projects,
+    skills,
+    certifications: base.certifications || [],
+    spokenLanguages
+  };
+
+  try {
+    const res = await fetch('/api/profile/structured-cv', {
+      method: 'PUT',
+      headers: getAuthHeaders(true),
+      body: JSON.stringify(structuredPayload)
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.structuredCv = structuredPayload;
+      state.tailoredCvCache = {}; // Flush cache so tailored resumes reflect latest edits
+      showToast('Structured Resume updated successfully', 'check');
+      await loadUserProfile();
+      triggerSearch();
+    } else {
+      showToast(data.error || 'Failed to save structured resume', 'alert-circle');
+    }
+  } catch (err) {
+    showToast(`Save error: ${err.message}`, 'alert-circle');
+  }
 }
 
 async function saveUserProfile(e) {

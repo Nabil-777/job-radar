@@ -3,11 +3,11 @@ const multer = require('multer');
 const { z } = require('zod');
 const { db } = require('../db/database');
 const { extractTextFromPdf } = require('../utils/pdfParser');
+const { parseResumeText, StructuredResumeSchema } = require('../services/cvParserService');
 const { extractSkillsFromText } = require('../services/matchingEngine');
 const { optionalAuth } = require('../middleware/auth.middleware');
 
 const router = express.Router();
-
 router.use(optionalAuth);
 
 const upload = multer({
@@ -28,7 +28,8 @@ const profileSchema = z.object({
   languages: z.union([z.string(), z.array(z.string())]).optional(),
   experienceSummary: z.string().optional(),
   educationSummary: z.string().optional(),
-  preferredLanguage: z.string().optional()
+  preferredLanguage: z.string().optional(),
+  structuredCv: z.any().optional()
 });
 
 // GET /api/profile
@@ -47,7 +48,8 @@ router.get('/', (req, res) => {
           phone: '',
           location: 'Morocco',
           skills: 'JavaScript, Python, React, Node.js, SQL, Docker',
-          preferredLanguage: 'English'
+          preferredLanguage: 'English',
+          structuredCv: null
         }
       });
     }
@@ -61,33 +63,32 @@ router.get('/', (req, res) => {
       }
     }
 
-    let languages = [];
-    if (row.languages_json) {
+    let structuredCv = null;
+    if (row.structured_cv_json) {
       try {
-        languages = JSON.parse(row.languages_json);
+        structuredCv = JSON.parse(row.structured_cv_json);
       } catch (e) {}
     }
 
     res.json({
       success: true,
       profile: {
-        id: row.id,
-        userId: row.user_id,
-        fullName: row.full_name || req.user?.fullName || 'Candidate',
-        title: row.title || 'Software Developer',
+        fullName: row.full_name || '',
+        title: row.title || '',
         email: row.email || req.user?.email || '',
         phone: row.phone || '',
         location: row.location || 'Morocco',
         linkedinUrl: row.linkedin_url || '',
         githubUrl: row.github_url || '',
         portfolioUrl: row.portfolio_url || '',
-        skills: Array.isArray(skills) ? skills.join(', ') : skills,
-        skillsList: skills,
-        languages: languages,
-        experienceSummary: row.experience_summary,
-        educationSummary: row.education_summary,
-        school: row.education_summary,
-        rawCvText: row.raw_cv_text ? true : false,
+        skills: Array.isArray(skills) ? skills.join(', ') : '',
+        skillsArray: Array.isArray(skills) ? skills : [],
+        languages: row.languages_json ? JSON.parse(row.languages_json) : ['Arabic', 'French', 'English'],
+        experienceSummary: row.experience_summary || '',
+        educationSummary: row.education_summary || '',
+        preferredLanguage: 'English',
+        rawCvText: !!row.raw_cv_text,
+        structuredCv,
         updatedAt: row.updated_at
       }
     });
@@ -101,7 +102,7 @@ router.post('/', (req, res) => {
   try {
     const validated = profileSchema.parse(req.body);
     const userId = req.user?.id || 'default';
-    const existing = db.prepare('SELECT id FROM user_profile WHERE user_id = ? OR id = ?').get(userId, userId);
+    const now = new Date().toISOString();
 
     let skillsArray = [];
     if (Array.isArray(validated.skills)) {
@@ -110,7 +111,9 @@ router.post('/', (req, res) => {
       skillsArray = validated.skills.split(',').map(s => s.trim()).filter(Boolean);
     }
 
-    const now = new Date().toISOString();
+    const structuredCvJson = validated.structuredCv ? JSON.stringify(validated.structuredCv) : null;
+
+    const existing = db.prepare('SELECT id FROM user_profile WHERE user_id = ? OR id = ?').get(userId, userId);
 
     if (existing) {
       db.prepare(`
@@ -123,8 +126,9 @@ router.post('/', (req, res) => {
           linkedin_url = COALESCE(?, linkedin_url),
           github_url = COALESCE(?, github_url),
           portfolio_url = COALESCE(?, portfolio_url),
-          skills_json = ?,
+          skills_json = COALESCE(?, skills_json),
           education_summary = COALESCE(?, education_summary),
+          structured_cv_json = CASE WHEN ? IS NOT NULL THEN ? ELSE structured_cv_json END,
           updated_at = ?
         WHERE id = ? OR user_id = ?
       `).run(
@@ -136,8 +140,10 @@ router.post('/', (req, res) => {
         validated.linkedinUrl || null,
         validated.githubUrl || null,
         validated.portfolioUrl || null,
-        JSON.stringify(skillsArray),
+        skillsArray.length ? JSON.stringify(skillsArray) : null,
         validated.educationSummary || null,
+        structuredCvJson,
+        structuredCvJson,
         now,
         existing.id,
         userId
@@ -145,12 +151,12 @@ router.post('/', (req, res) => {
     } else {
       db.prepare(`
         INSERT INTO user_profile (
-          id, user_id, full_name, title, email, phone, location, linkedin_url, github_url, portfolio_url, skills_json, education_summary, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          id, user_id, full_name, title, email, phone, location, linkedin_url, github_url, portfolio_url, skills_json, education_summary, structured_cv_json, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         userId,
         userId,
-        validated.fullName || req.user?.fullName || 'Candidate',
+        validated.fullName || 'Candidate',
         validated.title || 'Software Developer',
         validated.email || req.user?.email || '',
         validated.phone || '',
@@ -160,6 +166,7 @@ router.post('/', (req, res) => {
         validated.portfolioUrl || '',
         JSON.stringify(skillsArray),
         validated.educationSummary || '',
+        structuredCvJson,
         now
       );
     }
@@ -173,53 +180,147 @@ router.post('/', (req, res) => {
   }
 });
 
-// POST /api/profile/upload-cv (PDF CV Parser & Auto-Profile Extraction)
+// PUT /api/profile/structured-cv (Save user edits to Structured Resume)
+router.put('/structured-cv', (req, res) => {
+  try {
+    const validated = StructuredResumeSchema.parse(req.body);
+    const userId = req.user?.id || 'default';
+    const now = new Date().toISOString();
+
+    const flatSkills = [
+      ...(validated.skills.languages || []),
+      ...(validated.skills.frameworks || []),
+      ...(validated.skills.databases || []),
+      ...(validated.skills.cloudDevOps || []),
+      ...(validated.skills.aiCyberData || []),
+      ...(validated.skills.engineeringPractices || [])
+    ];
+
+    db.prepare(`
+      INSERT INTO user_profile (
+        id, user_id, full_name, title, email, phone, location, linkedin_url, github_url, portfolio_url, skills_json, structured_cv_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        full_name = excluded.full_name,
+        title = excluded.title,
+        email = excluded.email,
+        phone = excluded.phone,
+        location = excluded.location,
+        linkedin_url = excluded.linkedin_url,
+        github_url = excluded.github_url,
+        portfolio_url = excluded.portfolio_url,
+        skills_json = excluded.skills_json,
+        structured_cv_json = excluded.structured_cv_json,
+        updated_at = excluded.updated_at
+    `).run(
+      userId,
+      userId,
+      validated.basics.fullName,
+      validated.basics.headline,
+      validated.basics.email,
+      validated.basics.phone,
+      validated.basics.location,
+      validated.basics.links?.linkedin || '',
+      validated.basics.links?.github || '',
+      validated.basics.links?.portfolio || '',
+      JSON.stringify(flatSkills),
+      JSON.stringify(validated),
+      now
+    );
+
+    res.json({
+      success: true,
+      message: 'Structured CV updated successfully',
+      structuredCv: validated
+    });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ success: false, error: err.issues.map(e => e.message).join(', ') });
+    }
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST /api/profile/upload-cv (Coordinate-Aware PDF CV Parser & Auto-Extraction)
 router.post('/upload-cv', upload.single('cv'), async (req, res) => {
   try {
     if (!req.file || !req.file.buffer) {
       return res.status(400).json({ success: false, error: 'Please upload a valid PDF CV file.' });
     }
 
-    const rawText = await extractTextFromPdf(req.file.buffer);
+    let rawText = '';
+    try {
+      rawText = await extractTextFromPdf(req.file.buffer);
+    } catch (parseErr) {
+      if (parseErr.code === 'SCANNED_PDF_UNSUPPORTED') {
+        return res.status(422).json({
+          success: false,
+          code: 'SCANNED_PDF_UNSUPPORTED',
+          error: 'This appears to be a scanned image PDF without selectable text. Please upload a digital PDF or edit your details in the resume editor.'
+        });
+      }
+      throw parseErr;
+    }
+
     if (!rawText || rawText.length < 20) {
       return res.status(422).json({
         success: false,
+        code: 'SCANNED_PDF_UNSUPPORTED',
         error: 'Unable to extract text from the PDF. It may be scanned as an image or password protected.'
       });
     }
 
     const userId = req.user?.id || 'default';
+
+    // Parse into structured canonical resume JSON
+    const structuredCv = await parseResumeText(rawText);
     const detectedSkills = extractSkillsFromText(rawText);
 
-    // Extract potential email, phone, linkedin, github
-    const emailMatch = rawText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-    const phoneMatch = rawText.match(/(?:\+212|0)[5-7]\d{8}/);
-    const linkedinMatch = rawText.match(/linkedin\.com\/in\/[a-zA-Z0-9_-]+/i);
-    const githubMatch = rawText.match(/github\.com\/[a-zA-Z0-9_-]+/i);
+    // Combine taxonomy skills with parsed structured skills
+    const allSkillsSet = new Set([
+      ...detectedSkills,
+      ...(structuredCv.skills.languages || []),
+      ...(structuredCv.skills.frameworks || []),
+      ...(structuredCv.skills.databases || []),
+      ...(structuredCv.skills.cloudDevOps || []),
+      ...(structuredCv.skills.aiCyberData || []),
+      ...(structuredCv.skills.engineeringPractices || [])
+    ]);
+    const finalSkills = Array.from(allSkillsSet);
 
     const now = new Date().toISOString();
 
     db.prepare(`
       INSERT INTO user_profile (
-        id, user_id, email, phone, linkedin_url, github_url, skills_json, raw_cv_text, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, user_id, full_name, title, email, phone, location, linkedin_url, github_url, portfolio_url, skills_json, raw_cv_text, structured_cv_json, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
-        email = CASE WHEN email IS NULL OR email = '' THEN excluded.email ELSE email END,
-        phone = CASE WHEN phone IS NULL OR phone = '' THEN excluded.phone ELSE phone END,
-        linkedin_url = CASE WHEN linkedin_url IS NULL OR linkedin_url = '' THEN excluded.linkedin_url ELSE linkedin_url END,
-        github_url = CASE WHEN github_url IS NULL OR github_url = '' THEN excluded.github_url ELSE github_url END,
+        full_name = CASE WHEN excluded.full_name != 'Candidate Name' THEN excluded.full_name ELSE full_name END,
+        title = CASE WHEN excluded.title != 'Software Engineer' THEN excluded.title ELSE title END,
+        email = CASE WHEN excluded.email != '' THEN excluded.email ELSE email END,
+        phone = CASE WHEN excluded.phone != '' THEN excluded.phone ELSE phone END,
+        location = CASE WHEN excluded.location != '' THEN excluded.location ELSE location END,
+        linkedin_url = CASE WHEN excluded.linkedin_url != '' THEN excluded.linkedin_url ELSE linkedin_url END,
+        github_url = CASE WHEN excluded.github_url != '' THEN excluded.github_url ELSE github_url END,
+        portfolio_url = CASE WHEN excluded.portfolio_url != '' THEN excluded.portfolio_url ELSE portfolio_url END,
         skills_json = excluded.skills_json,
         raw_cv_text = excluded.raw_cv_text,
+        structured_cv_json = excluded.structured_cv_json,
         updated_at = excluded.updated_at
     `).run(
       userId,
       userId,
-      emailMatch ? emailMatch[0] : (req.user?.email || null),
-      phoneMatch ? phoneMatch[0] : null,
-      linkedinMatch ? `https://${linkedinMatch[0]}` : null,
-      githubMatch ? `https://${githubMatch[0]}` : null,
-      JSON.stringify(detectedSkills),
+      structuredCv.basics.fullName || 'Candidate Name',
+      structuredCv.basics.headline || 'Software Engineer',
+      structuredCv.basics.email || (req.user?.email || ''),
+      structuredCv.basics.phone || '',
+      structuredCv.basics.location || 'Morocco',
+      structuredCv.basics.links?.linkedin || '',
+      structuredCv.basics.links?.github || '',
+      structuredCv.basics.links?.portfolio || '',
+      JSON.stringify(finalSkills),
       rawText,
+      JSON.stringify(structuredCv),
       now
     );
 
@@ -227,15 +328,9 @@ router.post('/upload-cv', upload.single('cv'), async (req, res) => {
 
     res.json({
       success: true,
-      message: 'CV parsed and profile updated successfully!',
-      detectedSkills,
-      extractedMeta: {
-        email: emailMatch ? emailMatch[0] : null,
-        phone: phoneMatch ? phoneMatch[0] : null,
-        linkedin: linkedinMatch ? `https://${linkedinMatch[0]}` : null,
-        github: githubMatch ? `https://${githubMatch[0]}` : null,
-        textLength: rawText.length
-      },
+      message: 'CV parsed and structured profile generated successfully!',
+      structuredCv,
+      detectedSkills: finalSkills,
       profile: updated
     });
   } catch (err) {

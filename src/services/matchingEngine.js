@@ -1,33 +1,16 @@
-const COMMON_TECH_SKILLS = [
-  'javascript', 'typescript', 'python', 'java', 'c++', 'c#', '.net', 'php', 'ruby', 'go', 'rust', 'scala',
-  'react', 'angular', 'vue', 'next.js', 'nuxt', 'svelte', 'node.js', 'express', 'nestjs', 'django', 'fastapi',
-  'flask', 'spring', 'spring boot', 'laravel', 'symfony', 'asp.net',
-  'sql', 'postgresql', 'mysql', 'mongodb', 'redis', 'elasticsearch', 'oracle', 'dynamodb',
-  'docker', 'kubernetes', 'aws', 'azure', 'gcp', 'terraform', 'ansible', 'jenkins', 'gitlab', 'ci/cd',
-  'linux', 'git', 'rest api', 'graphql', 'kafka', 'rabbitmq', 'microservices',
-  'machine learning', 'deep learning', 'pytorch', 'tensorflow', 'nlp', 'llm', 'computer vision', 'data science',
-  'cybersecurity', 'soc', 'pentesting', 'siem', 'firewall', 'owasp', 'iso 27001', 'wireshark',
-  'devops', 'sysadmin', 'cloud', 'agile', 'scrum'
-];
+const { SKILL_TAXONOMY, extractTaxonomySkills, normalizeSkillName } = require('../utils/skillTaxonomy');
+
+// Flatten taxonomy for backward compatibility with tests
+const COMMON_TECH_SKILLS = Object.values(SKILL_TAXONOMY).flat().map(s => s.toLowerCase());
 
 /**
  * Extracts tech stack keywords from text (title + description + tags)
+ * Returns lowercase strings for robust matching and test compatibility
  */
 function extractSkillsFromText(text) {
   if (!text) return [];
-  const lower = text.toLowerCase();
-  const detected = new Set();
-
-  for (const skill of COMMON_TECH_SKILLS) {
-    // Word boundary check
-    const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(^|[^a-zA-Z0-9_#+])${escaped}([^a-zA-Z0-9_#+]|$)`, 'i');
-    if (regex.test(lower)) {
-      detected.add(skill);
-    }
-  }
-
-  return Array.from(detected);
+  const { allDetected } = extractTaxonomySkills(text);
+  return allDetected.map(s => s.toLowerCase());
 }
 
 /**
@@ -53,7 +36,22 @@ function calculateMatchScore(job, userProfile) {
       userSkills = userProfile.skills_json.split(',').map(s => s.trim());
     }
   }
-  const userSkillsLower = new Set(userSkills.map(s => s.toLowerCase().trim()));
+
+  // If skills_json is empty, fallback to structured_cv_json
+  let structuredData = null;
+  if (userProfile.structured_cv_json) {
+    try {
+      structuredData = typeof userProfile.structured_cv_json === 'string'
+        ? JSON.parse(userProfile.structured_cv_json)
+        : userProfile.structured_cv_json;
+      if (structuredData && structuredData.skills && userSkills.length === 0) {
+        userSkills = Object.values(structuredData.skills).flat();
+      }
+    } catch (e) {}
+  }
+
+  // Canonicalize user skills to lowercase
+  const userSkillsCanonical = new Set(userSkills.map(s => s.toLowerCase().trim()));
 
   // Extract job skills from tags, title and description
   const jobTags = Array.isArray(job.tags) ? job.tags : (Array.isArray(job.tags_json) ? job.tags_json : []);
@@ -66,11 +64,11 @@ function calculateMatchScore(job, userProfile) {
   const missingSkills = [];
 
   if (jobSkills.length === 0) {
-    // If no specific skills detected, award baseline 35 points if domain keywords match
     skillPoints = 35;
   } else {
     for (const skill of jobSkills) {
-      if (userSkillsLower.has(skill) || Array.from(userSkillsLower).some(us => us.includes(skill) || skill.includes(us))) {
+      const lower = skill.toLowerCase();
+      if (userSkillsCanonical.has(lower) || Array.from(userSkillsCanonical).some(us => us.includes(lower) || lower.includes(us))) {
         matchedSkills.push(skill);
       } else {
         missingSkills.push(skill);
@@ -83,13 +81,13 @@ function calculateMatchScore(job, userProfile) {
   // 2. Role & Seniority Fit (25 points)
   let seniorityPoints = 15;
   const jobLevel = (job.experienceLevel || job.experience_level || '').toLowerCase();
-  const userTitle = (userProfile.title || '').toLowerCase();
+  const userTitle = (userProfile.title || structuredData?.basics?.headline || '').toLowerCase();
 
   const isJobIntern = jobLevel.includes('intern') || jobLevel.includes('stage') || jobLevel.includes('pfe');
   const isJobJunior = jobLevel.includes('junior') || jobLevel.includes('entry') || jobLevel.includes('débutant');
   const isJobSenior = jobLevel.includes('senior') || jobLevel.includes('lead') || jobLevel.includes('architect');
 
-  const isUserStudent = userTitle.includes('student') || userTitle.includes('étudiant') || userTitle.includes('intern') || userTitle.includes('junior');
+  const isUserStudent = userTitle.includes('student') || userTitle.includes('étudiant') || userTitle.includes('intern') || userTitle.includes('junior') || userTitle.includes('élève');
 
   if (isUserStudent) {
     if (isJobIntern || isJobJunior) seniorityPoints = 25;
@@ -104,11 +102,11 @@ function calculateMatchScore(job, userProfile) {
   let locationPoints = 15;
   const jobLoc = (job.location || '').toLowerCase();
   const isJobRemote = job.remote === true || job.is_remote === 1 || jobLoc.includes('remote') || jobLoc.includes('télétravail');
-  const userLoc = (userProfile.location || 'Morocco').toLowerCase();
+  const userLoc = (userProfile.location || structuredData?.basics?.location || 'Morocco').toLowerCase();
 
   if (isJobRemote) {
     locationPoints = 25;
-  } else if (jobLoc.includes(userLoc) || (userLoc.includes('morocco') && (jobLoc.includes('casablanca') || jobLoc.includes('rabat') || jobLoc.includes('maroc')))) {
+  } else if (jobLoc.includes(userLoc) || (userLoc.includes('morocco') && (jobLoc.includes('casablanca') || jobLoc.includes('rabat') || jobLoc.includes('maroc') || jobLoc.includes('oujda')))) {
     locationPoints = 25;
   } else {
     locationPoints = 15;
