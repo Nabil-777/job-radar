@@ -1,4 +1,9 @@
 require('dotenv').config();
+const { validateEnv } = require('./src/config/validate-env');
+
+// Startup Environment Validation (Fail-Fast)
+validateEnv();
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
